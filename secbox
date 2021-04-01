@@ -103,7 +103,12 @@ cleanup() {
     trap - SIGINT SIGTERM ERR EXIT
 
     # Umount NFS shares if were enabled
-    [[ -n ${nfs_flag:-} ]] && nfs_umount_all
+    if [[ -n ${nfs_flag:-} ]]; then
+        # Check if a parallel secbox instance is using nfs, if yes do not umount exports
+        if ! ps -u | grep -v grep | grep -E "secbox.* --nfs" | grep -v $$ >/dev/null 2>&1; then
+            nfs_umount_all
+        fi
+    fi
 }
 
 print_version() {
