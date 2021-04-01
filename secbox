@@ -486,9 +486,13 @@ main() {
     type podman >/dev/null 2>&1 ||
         die "${red}[!]${no_format} Container engine missing: podman is required"
 
-    [[ $(grep "$(id -nu)" /etc/subuid) ]] && [[ $(grep "$(id -nu)" /etc/subgid) ]] ||
-        die "${red}[!]${no_format} Podman is not configured to run rootless containers, please configure it first.
+    if [[ $EUID -eq 0 ]]; then
+        msg "Are you sure you want to run secbox from root?"
+    else
+        [[ $(grep "$(id -nu)" /etc/subuid) ]] && [[ $(grep "$(id -nu)" /etc/subgid) ]] ||
+            die "${red}[!]${no_format} Podman is not configured to run rootless containers, please configure it first.
     https://github.com/containers/podman/blob/master/docs/tutorials/rootless_tutorial.md"
+    fi
     
     nfs_flag=''
 
