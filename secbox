@@ -421,8 +421,7 @@ secbox_exec() {
     # Credits to @giuseppe who suggested a clever workaround (_ti)
     ### tty 0<&1 &>/dev/null: use tty to test stdout instead of stdin :)
     local _ti="-ti"; tty 0<&1 &>/dev/null || _ti=""
-    podman container exec $_ti -w "$(pwd)" $container "$@" ||
-        msg "${red}[!]${no_format} try 'secbox help', you may want to use [--nfs] [--root] [--debug]"
+    podman container exec $_ti -w "$(pwd)" $container "$@"
 }
 
 secbox_destroy(){
