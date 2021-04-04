@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -Eeuo pipefail
+set -Euo pipefail
 trap cleanup SIGINT SIGTERM ERR EXIT
 # -----------------------------------------------------------------------------
 #                     One tool to rule them all, one tool to containerize them
@@ -43,13 +43,14 @@ trap cleanup SIGINT SIGTERM ERR EXIT
 
 print_help() {
     cat <<EOF
-Usage: ${script_name} [--debug] [-h] [-v] [--destroy] [--root] \\
+Usage: ${script_name} [--debug] [-h] [-v] [--sshfs] [--destroy] [--root] \\
                 [--no-color] [--nfs] [--alias] command [arg1 arg2...]
 
 A collection of all the needed tools for your daily work in the Security Team
 
 Available options:
 
+--sshfs         ................TODO................................
 --nfs           Makes NFS shares available for the requested command
                 This is useful for 'ics omg rr', tel <username>, etc
 --destroy       Destroy ${container} and related components
@@ -105,8 +106,16 @@ cleanup() {
     # Umount NFS shares if were enabled
     if [[ -n ${nfs_flag:-} ]]; then
         # Check if a parallel secbox instance is using nfs, if yes do not umount exports
-        if ! ps -u | grep -v grep | grep -E "secbox.* --nfs" | grep -v $$ >/dev/null 2>&1; then
+        if ! nfs_used_by_other_secbox_process; then
             nfs_umount_all
+        fi
+    fi
+
+    # Umount SSHFS if was enabled
+    if [[ -n ${sshfs_flag:-} ]]; then
+        # Check if a parallel secbox instance is using sshfs, if yes do not umount
+        if ! sshfs_used_by_other_secbox_process; then
+            sshfs_umount
         fi
     fi
 }
@@ -181,7 +190,7 @@ enable_container_service() {
     }
 }
 
-suse_internal_network_access() {
+suse_internal_network() {
     # Check if VPN connection is available, fail if any of the following end-point is not reachable
     local -ar _know_internal_addresses=(
         # Check reachability of wotan's ssh service, since it likely has best uptime
@@ -196,6 +205,23 @@ suse_internal_network_access() {
         (echo > /dev/tcp/$_address) >/dev/null 2>&1 || return 1
     done
     return 0
+}
+
+nfs_used_by_other_secbox_process() {
+    ps -u | grep -v grep | grep -v $$ | grep -E "secbox.* --nfs" >/dev/null 2>&1 || return 0
+    return 1
+}
+
+sshfs_used_by_other_secbox_process() {
+    ps -u | grep -v grep | grep -v $$ | grep -E "secbox.* --sshfs" >/dev/null 2>&1 || return 0
+    return 1
+
+    #ps -u | grep -v grep | grep -v $$ | grep -E "secbox.* --sshfs" >/dev/null 2>&1
+    #return $?
+    #if ps -u | grep -v grep | grep -v $$ | grep -E "secbox.* --sshfs" >/dev/null 2>&1; then
+    #    return 0
+    #fi
+    #return 1
 }
 
 sudo_privs() {
@@ -250,6 +276,84 @@ nfs_mount_all() {
     done
 }
 
+sshfs_exists() {
+    podman container exec $container sshfs --version > /dev/null 2>&1
+    return $?
+}
+
+sshfs_mount() {
+    sshfs_exists || {
+        msg "${orange}[*]${no_format} ${container} sshfs is not installed in the container"
+        return 1
+    }
+
+    podman container exec -d $container mkdir -p /mounts > /dev/null 2>&1
+    podman >/dev/null 2>&1 container exec -d $container sshfs -o nonempty,ro,StrictHostKeyChecking=no,compression=yes wotan:/mounts /mounts
+}
+
+sshfs_umount() {
+    podman container exec -d $container fusermount -u /mounts > /dev/null 2>&1 ||
+        msg "${orange}[*]${no_format} ${container} cannot umount sshfs mountpoint: /mounts"
+}
+
+fuse_access() {
+    [[ -c /dev/fuse ]] || {
+        msg "/dev/fuse does not exist"
+        return 1
+    }
+
+    # check others permissions of /dev/fuse special character file
+    local _others_permission=$(stat -L -c "%A" /dev/fuse | rev | cut -b -3 | rev)
+    if [[ ! $_others_permission =~ ^rw.$ ]]; then
+        # /dev/fuse is not usable by anyone
+        # check group permissions and check if we are part of that group
+        local _group_permission=$(stat -L -c "%A" /dev/fuse | cut -b 5- | cut -b -3)
+        local _gorup=$(stat -L -c "%g" /dev/fuse)
+        if [[ $_group_permission =~ ^rw.$ ]]; then
+            # /dev/fuse is usable by group users
+            local _g 
+            for _g in $(id -G); do
+                [[ "${_g}" == "${_gorup}" ]] && return 0 # if I'm part of that group return 0 (OK)
+            done
+        fi
+        msg "/dev/fuse cannot be accessed by ${USER}"
+        return 1
+    fi
+
+    return 0 # /dev/fuse exists and can be used by any user
+}
+
+mount_remote_volumes() {
+    [[ -n $nfs_flag && -n $sshfs_flag ]] && {
+        # Avoid umount from cleanup()
+        nfs_flag=''
+        sshfs_flag=''
+        die "Options --sshfs and --nfs are mutual exclusivity, pick one of the two"
+    }
+
+    [[ -n $nfs_flag && sshfs_used_by_other_secbox_process ]] &&
+        die "Cannot use --nfs because another secbox instance is using --sshfs"
+
+    [[ -n $sshfs_flag && nfs_used_by_other_secbox_process ]] && 
+        die "Cannot use --sshfs because another secbox instance is using --nfs"
+
+    if [[ -n $nfs_flag ]]; then
+        if ! suse_internal_network; then
+            msg "${orange}[*]${no_format} can't use NFS, are you connected to the SUSE network?"
+        else
+            nfs_mount_all
+        fi
+    fi
+
+    if [[ -n $sshfs_flag ]]; then
+        if ! suse_internal_network; then
+            msg "${orange}[*]${no_format} can't use SSHFS, are you connected to the SUSE network?"
+        else
+            sshfs_mount
+        fi
+    fi
+}
+
 create_container() {
     podman image ls | grep -E "$image_name" >/dev/null 2>&1 || {
         # If the image does not exist, pull it
@@ -275,10 +379,25 @@ create_container() {
                             --name ${container} \
                             --userns=keep-id \
                             -u $(id -u) \
+                            --network host \
                             -v ${tmp_dir}:${tmp_dir} \
                             -v ${HOME}:${HOME} \
                             -w ${HOME}"
 
+    # SYS_ADMIN capabilities are added to use FUSE from the container in order to mount sshfs, keep in mind
+    # that this is a rootless container, hence not all SYS_ADMIN capabilites are available from the container
+    if fuse_access; then
+        _podman_cmdline="${_podman_cmdline} --device /dev/fuse --cap-add SYS_ADMIN"
+    else
+        msg "${orange}[*]${no_format} fuse not available, --sshfs option will not work"
+    fi
+
+    # If ssh-agent is configured, share it with the container (mainly used by sshfs)
+    [ -z "${SSH_AUTH_SOCK:-}" ] ||
+        _podman_cmdline="${_podman_cmdline} -e SSH_AUTH_SOCK=/ssh-agent \
+                                            -v ${SSH_AUTH_SOCK}:/ssh-agent"
+
+    # If Dbus-session exists, share it with the container (mainly used by osc)
     [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] ||
         _podman_cmdline="${_podman_cmdline} -e DBUS_SESSION_BUS_ADDRESS=\"${DBUS_SESSION_BUS_ADDRESS}\""
 
@@ -345,7 +464,7 @@ upstream_image_version() {
 }
 
 pull_image() {
-    suse_internal_network_access || return 1
+    suse_internal_network || return 1
     local _upstream=$(upstream_image_version)
     if podman pull "${registry}/${image_name}:${_upstream:-}" >/dev/null 2>&1; then
         msg "${green}[*]${no_format} ${container} v.${_upstream:-} downloaded"
@@ -498,6 +617,7 @@ main() {
     https://github.com/containers/podman/blob/master/docs/tutorials/rootless_tutorial.md"
     fi
     
+    sshfs_flag=''
     nfs_flag=''
 
     while :; do
@@ -510,21 +630,16 @@ main() {
             --no-color) no_color=1 && setup_colors ;;
             --alias) aliases; exit ;;
             --nfs) nfs_flag='true' ;;
+            --sshfs) sshfs_flag='true' ;;
             -?*) die "${orange}Unknown option${no_format}: ${1:-}" 0 ;;
             *) break ;;
         esac
         shift
     done
 
-    if [[ -n $nfs_flag ]]; then
-        if ! suse_internal_network_access; then
-            msg "${orange}[*]${no_format} can't use NFS, are you connected to the SUSE network?"
-        else
-            nfs_mount_all
-        fi
-    fi
+    mount_remote_volumes
 
-    if suse_internal_network_access; then
+    if suse_internal_network; then
         update_available && update_image
     fi
 
