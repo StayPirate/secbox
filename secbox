@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-set -Euo pipefail
+# shellcheck disable=SC2155
+# shellcheck disable=SC2034
+set -u
 trap cleanup SIGINT SIGTERM ERR EXIT
 # -----------------------------------------------------------------------------
 #                     One tool to rule them all, one tool to containerize them
@@ -46,20 +48,26 @@ print_help() {
 Usage: ${script_name} [--debug] [-h] [-v] [--sshfs] [--destroy] [--root] \\
                 [--no-color] [--nfs] [--alias] command [arg1 arg2...]
 
-A collection of all the needed tools for your daily work in the Security Team
+A collection of needed tools for your daily work in the Security Team.
+For more information: https://github.com/StayPirate/secbox
 
 Available options:
 
---sshfs         ................TODO................................
---nfs           Makes NFS shares available for the requested command
-                This is useful for 'ics omg rr', tel <username>, etc
---destroy       Destroy ${container} and related components
-         [-i]   Delete the image too
-         [-f]   Not interactive, Yes by default
---root          Enter the running container as root user, container debug mode
+--sshfs         Makes wotan:/mounts available to the container.
+                In order to works you should be able to access wotan.suse.de via ssh
+                from your host system by simply run 'ssh wotan', without interaction
+                You can find an example stanza in the README.md of this project.
+                ${script_name} support ssh-agent out-of-the-box if it's configured
+                in the host system.
+--nfs           Alternative to --sshfs, it makes some of the NFS exports available
+                to the container. --sshfs should be prefered.
+--destroy       Destroy ${container} container and related components
+         [-i]   Also delete the container image
+         [-f]   Not interactive, [Y]es by default
+--root          Enter the running container as root user. Container debug mode
 --debug         Script debug mode
 --no-color      Turn off colored output
---alias         Print a list of useful aliases
+--alias         Print a list of useful aliases, you can add it to your .bashrc
 -h, --help      Print this help and exit
 -v, --version   Print component versions
 EOF
@@ -90,14 +98,11 @@ declare -ar nfs_shares=(
     # dist and mirror are required by `osc omg rr` to perform tests.
     "dist.suse.de:/dist,/mounts/dist,4.2"
     "loki.suse.de:/vol/euklid,/mounts/mirror,3"
-    #"loki.suse.de:/real-home/bin,/mounts/internal-tools,3"
-    # ^^^^ access denied here, was working before (╯°□°)╯︵ ┻━┻. Need to talk to infra!
     #"hilbert.suse.de:/work,/mounts/work,4.2"
     #"rufus.suse.de:/vol/schnell,/mounts/schnell,3"
     #"rufus.suse.de:/vol/work_users,/mounts/work_users,3"
     #"hilbert.suse.de:/built,/mounts/built,4.2"
     #"dust.suse.de:/unpacked,/mounts/unpacked,4.2"
-    # ^^^^ access denied here (╯°□°)╯︵ ┻━┻. Need to talk to infra!
 )
 
 cleanup() {
@@ -105,24 +110,30 @@ cleanup() {
 
     # Umount NFS shares if were enabled
     if [[ -n ${nfs_flag:-} ]]; then
-        # Check if a parallel secbox instance is using nfs, if yes do not umount exports
-        if ! nfs_used_by_other_secbox_process; then
-            nfs_umount_all
+        if nfs_is_mounted; then
+            # Check if a parallel secbox instance is using nfs, if yes do not umount exports
+            if [[ $(secbox_instances_using_nfs) -le 2 ]]; then
+                nfs_umount_all &&
+                    msg_to_secbox_sessions "==== Another ${script_name} instance has umounted the nfs exports in /mounts ===="
+            fi
         fi
     fi
 
     # Umount SSHFS if was enabled
     if [[ -n ${sshfs_flag:-} ]]; then
-        # Check if a parallel secbox instance is using sshfs, if yes do not umount
-        if ! sshfs_used_by_other_secbox_process; then
-            sshfs_umount
+        if sshfs_is_mounted; then
+            # Check if a parallel secbox instance is using sshfs, if yes do not umount
+            if [[ $(secbox_instances_using_sshfs) -le 2 ]]; then
+                sshfs_umount &&
+                    msg_to_secbox_sessions "==== Another ${script_name} instance has umounted wotan:/mounts in /mounts ===="
+            fi
         fi
     fi
 }
 
 print_version() {
     local _version_str="script\t:\t${script_name}\tv.${script_version}"
-    if podman container exists $container; then
+    if secbox_container_exists; then
         local _image_version=$(local_image_container_version)
         local _container_status=$(podman container inspect --format '{{.State.Status}}' ${container} 2>/dev/null)
         _version_str="${_version_str}\nimage\t:\t${image_name}\tv.${_image_version}"
@@ -156,6 +167,16 @@ die() {
   exit "$_code"
 }
 
+msg_to_secbox_sessions() {
+    secbox_container_exists || return
+
+    local _pts
+    for _pts in $(podman container exec $container find /dev/pts/ -maxdepth 1 -regex '^/dev/pts/[0-9]+$'); do
+        echo "$_pts" | grep -E "/dev/pts/[0-9]+" > /dev/null 2>&1 &&
+            podman container exec $container sh -c "echo \"$*\" > \"$_pts\""
+    done
+}
+
 aliases() {
     echo "
 osc='secbox osc'
@@ -184,10 +205,8 @@ enable_container_service() {
         systemctl --user daemon-reload
     }
 
-    systemctl --user is-enabled --quiet ${container}.service || {
+    systemctl --user is-enabled --quiet ${container}.service ||
         systemctl --user enable ${container}.service > /dev/null 2>&1
-        return $?
-    }
 }
 
 suse_internal_network() {
@@ -202,37 +221,45 @@ suse_internal_network() {
 
     for _address in "${_know_internal_addresses[@]}"; do
         # Fail at first connection that can't be estabilished
-        (echo > /dev/tcp/$_address) >/dev/null 2>&1 || return 1
+        (echo > /dev/tcp/$_address) >/dev/null 2>&1 || return
     done
-    return 0
 }
 
-nfs_used_by_other_secbox_process() {
-    ps -u | grep -v grep | grep -v $$ | grep -E "secbox.* --nfs" >/dev/null 2>&1 || return 0
-    return 1
+secbox_instances_using_nfs() {
+    local _instances=0
+    _instances=$(ps -xo pid,cmd | grep -v grep | grep -v $$ | grep -E "secbox.* --nfs" | wc -l)
+    echo "$_instances"
 }
 
-sshfs_used_by_other_secbox_process() {
-    ps -u | grep -v grep | grep -v $$ | grep -E "secbox.* --sshfs" >/dev/null 2>&1 || return 0
-    return 1
-
-    #ps -u | grep -v grep | grep -v $$ | grep -E "secbox.* --sshfs" >/dev/null 2>&1
-    #return $?
-    #if ps -u | grep -v grep | grep -v $$ | grep -E "secbox.* --sshfs" >/dev/null 2>&1; then
-    #    return 0
-    #fi
-    #return 1
+secbox_instances_using_sshfs() {
+    local _instances=0
+    _instances=$(ps -xo pid,cmd | grep -v grep | grep -v $$ | grep -E "secbox.* --sshfs" | wc -l)
+    echo "$_instances"
 }
 
 sudo_privs() {
-    sudo -nv >/dev/null 2>&1 && return 0 || return 1
+    sudo -nv >/dev/null 2>&1
+}
+
+nfs_is_mounted() {
+    local _share
+    for _share in "${nfs_shares[@]}"; do                                    # nfs.example.tld:/a/b,/mount/point,4.2
+
+        local _nfs_address=$(echo "$_share" | cut -d "," -f 1)              # nfs.example.tld:/a/b
+        local _nfs_name=$(echo "${_nfs_address#*/}" | sed 's/\//_/')        # nfs.example.tld:/a/b -> a_b
+
+        if nfs_volume_exists "${_nfs_name}" "${_nfs_address}"; then
+            # If at least one volume is mounted, return true
+            return 0
+        fi
+    done
+    return 1
 }
 
 nfs_volume_exists() {
     # $1 name - (e.g.: vol_euklid)
     # $2 address - (e.g.: loki.suse.de:/vol/euklid)
     mount | grep -E "${2} on ${nfs_volumes_dir}/${1}" > /dev/null 2>&1
-    return $?
 }
 
 nfs_umount_all() {
@@ -248,17 +275,17 @@ nfs_umount_all() {
                 msg "${orange}[*]${no_format} NFS: cannot umount ${nfs_volumes_dir}/${_nfs_name}"
         fi
     done
-    return 0
 }
 
 nfs_mount_all() {
     local _share
-    for _share in "${nfs_shares[@]}"; do                                # nfs.example.tld:/a/b,/mount/point,4.2
+    local _nfs_mount_succeed=1 #default not succeeded
+    for _share in "${nfs_shares[@]}"; do                                    # nfs.example.tld:/a/b,/mount/point,4.2
 
-        local _nfs_address=$(echo "$_share" | cut -d "," -f 1)          # nfs.example.tld:/a/b
-        local _nfs_mountpoint=$(echo "$_share" | cut -d "," -f 2)       # /mount/point
-        local _nfs_version=$(echo "$_share" | cut -d "," -f 3)          # 4.2
-        local _nfs_name=$(echo "${_nfs_address#*/}" | sed 's/\//_/')    # nfs.example.tld:/a/b -> a_b
+        local _nfs_address=$(echo "$_share" | cut -d "," -f 1)              # nfs.example.tld:/a/b
+        local _nfs_mountpoint=$(echo "$_share" | cut -d "," -f 2)           # /mount/point
+        local _nfs_version=$(echo "$_share" | cut -d "," -f 3)              # 4.2
+        local _nfs_name=$(echo "${_nfs_address#*/}" | sed 's/\//_/')        # nfs.example.tld:/a/b -> a_b
 
         if ! nfs_volume_exists "${_nfs_name}" "${_nfs_address}"; then
             sudo_privs || msg "${cyan}[*]${no_format} Request sudo privs for ${USER} to mount NFS volumes:"
@@ -267,18 +294,25 @@ nfs_mount_all() {
                 # NFS share not mounted yet, and the mountpoint is not empty
                 msg "${orange}[*]${no_format} NFS: cannot mount ${nfs_volumes_dir}/${_nfs_name}, mountpoint not empty"
             }
-            sudo mount -t nfs \
-                -o vers="$_nfs_version",ro,noatime,proto=tcp,sec=sys,local_lock=none,rsize=1048576,wsize=1048576 \
-                "$_nfs_address" \
-                "${nfs_volumes_dir}/${_nfs_name}" > /dev/null 2>&1 ||
-                    msg "${orange}[*]${no_format} NFS: cannot mount ${nfs_volumes_dir}/${_nfs_name}"
+            if sudo mount -t nfs \
+            -o vers="$_nfs_version",ro,noatime,proto=tcp,sec=sys,local_lock=none,rsize=1048576,wsize=1048576 \
+            "$_nfs_address" \
+            "${nfs_volumes_dir}/${_nfs_name}" > /dev/null 2>&1; then
+                _nfs_mount_succeed=0 # At least one nfs export has been mounted
+            else
+                msg "${orange}[*]${no_format} NFS: cannot mount ${nfs_volumes_dir}/${_nfs_name}"
+            fi
         fi
     done
+    return $_nfs_mount_succeed
 }
 
 sshfs_exists() {
     podman container exec $container sshfs --version > /dev/null 2>&1
-    return $?
+}
+
+sshfs_is_mounted() {
+    podman container exec $container mount | grep "on /mounts type fuse.sshfs" > /dev/null 2>&1 || return 1
 }
 
 sshfs_mount() {
@@ -292,7 +326,7 @@ sshfs_mount() {
 }
 
 sshfs_umount() {
-    podman container exec -d $container fusermount -u /mounts > /dev/null 2>&1 ||
+    podman container exec -d $container fusermount -uz /mounts > /dev/null 2>&1 ||
         msg "${orange}[*]${no_format} ${container} cannot umount sshfs mountpoint: /mounts"
 }
 
@@ -302,7 +336,7 @@ fuse_access() {
         return 1
     }
 
-    # check others permissions of /dev/fuse special character file
+    # check permissions for "others" of the /dev/fuse special character file
     local _others_permission=$(stat -L -c "%A" /dev/fuse | rev | cut -b -3 | rev)
     if [[ ! $_others_permission =~ ^rw.$ ]]; then
         # /dev/fuse is not usable by anyone
@@ -313,45 +347,57 @@ fuse_access() {
             # /dev/fuse is usable by group users
             local _g 
             for _g in $(id -G); do
-                [[ "${_g}" == "${_gorup}" ]] && return 0 # if I'm part of that group return 0 (OK)
+                [[ "${_g}" == "${_gorup}" ]] && return # if I'm part of that group (OK)
             done
         fi
         msg "/dev/fuse cannot be accessed by ${USER}"
         return 1
     fi
-
-    return 0 # /dev/fuse exists and can be used by any user
+    # if here, then /dev/fuse exists and can be used by any user
 }
 
 mount_remote_volumes() {
-    [[ -n $nfs_flag && -n $sshfs_flag ]] && {
-        # Avoid umount from cleanup()
-        nfs_flag=''
-        sshfs_flag=''
-        die "Options --sshfs and --nfs are mutual exclusivity, pick one of the two"
+    suse_internal_network || {
+        msg "${orange}[*]${no_format} can't use NFS, are you connected to the SUSE network?"
+        return 1
     }
 
-    [[ -n $nfs_flag && sshfs_used_by_other_secbox_process ]] &&
-        die "Cannot use --nfs because another secbox instance is using --sshfs"
+    [[ -n $nfs_flag && -n $sshfs_flag ]] && {
+        die "[!] Options --sshfs and --nfs are mutual exclusivity, pick one of the two"
+    }
 
-    [[ -n $sshfs_flag && nfs_used_by_other_secbox_process ]] && 
-        die "Cannot use --sshfs because another secbox instance is using --nfs"
+    if [[ -n $nfs_flag ]] && [[ $(secbox_instances_using_sshfs) -ge 1 ]]; then
+        die "[!] Cannot use --nfs because another ${script_name} instance is using --sshfs"
+    fi
+
+    if [[ -n $sshfs_flag ]] && [[ $(secbox_instances_using_nfs) -ge 1 ]]; then
+        die "[!] Cannot use --sshfs because another ${script_name} instance is using --nfs"
+    fi
 
     if [[ -n $nfs_flag ]]; then
-        if ! suse_internal_network; then
-            msg "${orange}[*]${no_format} can't use NFS, are you connected to the SUSE network?"
-        else
-            nfs_mount_all
-        fi
+        nfs_mount_all &&
+            msg_to_secbox_sessions "==== Another ${script_name} instance has mounted the nfs exports in /mounts ===="
     fi
 
-    if [[ -n $sshfs_flag ]]; then
-        if ! suse_internal_network; then
-            msg "${orange}[*]${no_format} can't use SSHFS, are you connected to the SUSE network?"
+    if [[ -n $sshfs_flag ]] && ! sshfs_is_mounted; then
+        if ! ssh -qo "BatchMode=yes" wotan exit; then
+            msg "${orange}[*]${no_format} ${container} cannot access wotan via 'ssh wotan'.
+    Please ensure you have properly configured wotan in your ~/.ssh/config. A valid stanza should be like:
+    Host wotan
+        HostName wotan.suse.de
+        User <YOUR_USERNAME>
+        PreferredAuthentications publickey
+        IdentityFile /path/to/your/key
+    you could avoid IdentityFile in case your key is loaded in the ssh-agent, in this case ${script_name} will use it"
         else
-            sshfs_mount
+            sshfs_mount &&
+                msg_to_secbox_sessions "==== Another ${script_name} instance has mounted wotan:/mounts in /mounts ===="
         fi
     fi
+}
+
+secbox_container_exists() {
+    podman container exists $container
 }
 
 create_container() {
@@ -359,11 +405,9 @@ create_container() {
         # If the image does not exist, pull it
         msg "${orange}[*]${no_format} ${container} image not found"
         read -ep "[.] Do you want to pull the image right now? [Y/n] " -n 1 -r
-        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-            pull_image || return $?
-        else
+        [[ $REPLY =~ ^[Nn]$ ]] &&
             return 1
-        fi
+        pull_image
     }
 
     local _image_version=$(local_most_recent_image_version)
@@ -416,13 +460,12 @@ create_container() {
     _podman_cmdline="${_podman_cmdline} \
                      ${registry}/${image_name}:${_image_version}"
 
-    eval "$_podman_cmdline" > /dev/null 2>&1 || return $?
+    eval "$_podman_cmdline" > /dev/null 2>&1 || return
     enable_container_service
-    return 0
 }
 
 start_container() {
-    podman container exists $container || {
+    secbox_container_exists || {
         # If the container does not exist, create it
         print_logo
         msg "${orange}[*]${no_format} ${container} container not found"
@@ -435,17 +478,16 @@ start_container() {
 
     systemctl --user is-active --quiet $container.service >/dev/null 2>&1
     local _service_status=$?
-    case $_service_status in
-    0)  return 0 ;;
-    3)  systemctl --user restart $container.service >/dev/null 2>&1
-        return $? ;;
-    *)  return 1 ;;
-    esac
+    if [[ $_service_status == "3" ]]; then
+        systemctl --user restart $container.service >/dev/null 2>&1
+    else
+        return $_service_status
+    fi
 }
 
 local_image_container_version() {
     local _version=''
-    podman container exists $container && {
+    secbox_container_exists && {
         _version=$(podman container inspect --format '{{.ImageName}}' $container | cut -d ":" -f 2)
     }
     echo "$_version"
@@ -464,22 +506,21 @@ upstream_image_version() {
 }
 
 pull_image() {
-    suse_internal_network || return 1
+    suse_internal_network || return
     local _upstream=$(upstream_image_version)
     if podman pull "${registry}/${image_name}:${_upstream:-}" >/dev/null 2>&1; then
         msg "${green}[*]${no_format} ${container} v.${_upstream:-} downloaded"
-        return 0
     else
         msg "${red}[!]${no_format} canno pull the image"
+        return 1
     fi
-    return 1
 }
 
 update_image() {
     read -ep "[.] An update is available, do you want to update the container now? [Y/n] " -n 1 -r
     if [[ ! $REPLY =~ ^[Nn]$ ]]; then
         if pull_image; then
-            if podman container exists $container; then
+            if secbox_container_exists; then
                 if secbox_destroy -f -i; then
                     if create_container; then
                         start_container
@@ -509,14 +550,13 @@ update_available() {
     [[ -z $_version_in_use ]] && _local_version=${_local_most_recent_image:-} || _local_version=${_version_in_use:-}
 
     if [[ "${_upstream_version:-}" =~ ^[0-9.]+$ && "${_local_version:-}" =~ ^[0-9.]+$ ]]; then
-        [[ $_upstream_version > $_local_version ]] && return 0
+        [[ $_upstream_version > $_local_version ]] && return
     fi
     return 1
 }
 
 systemd_service_is_enabled() {
     systemctl --user is-enabled --quiet ${container}.service
-    return $?
 }
 
 systemd_service_is_disabled() {
@@ -526,7 +566,6 @@ systemd_service_is_disabled() {
 
 container_is_running() {
     podman container ls --all | grep -qE "Up.*${container}"
-    return $?
 }
 
 container_is_not_running() {
@@ -544,7 +583,7 @@ secbox_exec() {
 }
 
 secbox_destroy(){
-    podman container exists $container || die "${orange}[*]${no_format} ${container} does not exist"
+    secbox_container_exists || die "${orange}[*]${no_format} ${container} does not exist"
     
     print_logo
 
@@ -579,7 +618,6 @@ secbox_destroy(){
             podman image rm "${registry}/${image_name}:${_image_id:-}" > /dev/null 2>&1 && 
                 msg "${green}[.]${no_format} ${container} image deleted"
         fi
-        return 0
     else
         msg "${red}[!]${no_format} ${container} container cannot be deleted"
         return 1
@@ -587,7 +625,7 @@ secbox_destroy(){
 }
 
 secbox_root() {
-    podman container exists $container || die "${red}[!]${no_format} ${container} container does not exist"
+    secbox_container_exists || die "${red}[!]${no_format} ${container} container does not exist"
 
     msg "${red}"
     echo -e "    !!!\t                          ~ Be CaReFuL ~\t!!!
@@ -612,16 +650,17 @@ main() {
     if [[ $EUID -eq 0 ]]; then
         msg "Are you sure you want to run secbox from root?"
     else
-        [[ $(grep "$(id -nu)" /etc/subuid) ]] && [[ $(grep "$(id -nu)" /etc/subgid) ]] ||
+        if ! (grep -q "$(id -nu)" /etc/subuid && grep -q "$(id -nu)" /etc/subgid); then
             die "${red}[!]${no_format} Podman is not configured to run rootless containers, please configure it first.
     https://github.com/containers/podman/blob/master/docs/tutorials/rootless_tutorial.md"
+        fi
     fi
     
     sshfs_flag=''
     nfs_flag=''
 
     while :; do
-        case ${1:-} in
+        case "${1:-}" in
             -h | --help | help | "") print_help; exit ;;
             -v | --version) print_version; exit ;;
             --debug) set -x ;;
