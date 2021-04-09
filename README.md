@@ -1,8 +1,28 @@
 # Secbox
 
-TODO
+TODO: description
 
-[...]
+
+## Install
+
+**zypper**
+
+ * OpenSUSE Leap 15.2
+
+        zypper addrepo https://download.opensuse.org/repositories/security/openSUSE_Leap_15.2/security.repo && \
+        zypper --non-interactive --gpg-auto-import-keys refresh && \
+        zypper --non-interactive install -y secbox
+
+ * OpenSUSE Tumbleweed
+
+        zypper addrepo https://download.opensuse.org/repositories/security/openSUSE_Tumbleweed/security.repo && \
+        zypper --non-interactive --gpg-auto-import-keys refresh && \
+        zypper --non-interactive install -y secbox
+
+**git**
+
+    git clone https://github.com/StayPirate/secbox.git
+    export PATH=$PATH:$(pwd)/secbox
 
 ## SSHFS
 
@@ -19,3 +39,7 @@ A better approach is to use `--sshfs` option. Secbox can use sshfs (installed in
 
 you could avoid IdentityFile in case your key is loaded in the ssh-agent, in this case secbox will be able to get it from there.
 If you encotuner issues, try to delete the container and create once again via `secbox --destroy` and then use `secbox` again with any command.
+
+## Aliases
+
+`secbox --alias` provides some basic aliases that you can add to your `~/.bashrc`. If you create other useful aliases don't be shy and submit them via PR, I'll be glad to add them.
