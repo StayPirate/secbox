@@ -202,6 +202,8 @@ alias tel='secbox --sshfs tel \"\$@\"' \
 enable_container_service() {
 # Configure the container to start at boot
 
+    # Create systemd user's folder if don't exists
+    mkdir -p "${container_unit%/*}" > /dev/null 2>&1
     # If systemd unit does not exist, create it
     systemctl --user status ${container}.service >/dev/null 2>&1 || {
         if podman generate systemd --name $container > "$container_unit"; then
