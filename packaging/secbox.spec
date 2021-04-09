@@ -17,7 +17,7 @@ Source:         %{archive_prefix}-%{version}.tar.xz
 BuildArch:      noarch
 Requires:       podman
 Requires:       curl
-Requires:       openssh
+Recommends:     openssh
 
 %description
 Secbox is a toolbox that provides an out-of-the-box working setup for your
