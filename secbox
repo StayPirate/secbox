@@ -173,7 +173,7 @@ msg_to_secbox_sessions() {
     local _pts
     for _pts in $(podman container exec $container find /dev/pts/ -maxdepth 1 -regex '^/dev/pts/[0-9]+$'); do
         echo "$_pts" | grep -E "/dev/pts/[0-9]+" > /dev/null 2>&1 &&
-            podman container exec $container sh -c "echo \"$*\" > \"$_pts\""
+            podman 2>/dev/null container exec $container sh -c "echo \"$*\" > \"$_pts\""
     done
 }
 
