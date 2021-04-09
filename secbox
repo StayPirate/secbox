@@ -3,6 +3,7 @@
 # shellcheck disable=SC2034
 set -u
 trap cleanup SIGINT SIGTERM ERR EXIT
+declare -r script_version="1.1"
 # -----------------------------------------------------------------------------
 #                     One tool to rule them all, one tool to containerize them
 #                   One tool to bring them all, and in the namespace bind them
@@ -92,7 +93,6 @@ declare -r container_unit="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/${cont
 declare -r local_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/secbox"
 declare -r local_data_dir="${XDG_DATA_HOME:-$HOME/.local/share}/secbox"
 declare -r nfs_volumes_dir="${local_data_dir}/volumes"
-declare -r script_version="1.0"
 declare -ar nfs_shares=(
 ### address:/share,mountpoint,nfs_version
     # dist and mirror are required by `osc omg rr` to perform tests.
@@ -178,12 +178,24 @@ msg_to_secbox_sessions() {
 }
 
 aliases() {
-    echo "
-osc='secbox osc'
-isc='secbox osc -A ibs'
-is_maintained='secbox is_maintained'
-quilt='secbox quilt'
-tel='secbox tel'
+    echo "\
+### OBS/IBS/PBS
+alias osc='secbox osc'
+alias psc='secbox osc -A pbs'
+alias isc='f(){ if [[ \"\$@\"  =~ \"omg\" ]]; then
+                secbox --sshfs osc -A ibs "\$@";
+              else
+                secbox osc -A ibs "\$@";
+              fi; }; f'
+alias is_maintained='secbox is_maintained'
+alias quilt='secbox squilt'
+alias oscsd='osc service localrun download_files'
+alias oscb='osc build --ccache --cpio-bulk-download --download-api-only'
+alias bugzilla='secbox bugzilla'
+
+### Internal Tools
+alias foodchain='secbox --sshfs foodchain \"\$@\"'
+alias tel='secbox --sshfs tel \"\$@\"' \
 "
 }
 
