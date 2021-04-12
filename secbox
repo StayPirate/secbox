@@ -157,14 +157,14 @@ setup_colors() {
 }
 
 msg() {
-  echo >&2 -e "${1:-}"
+    echo >&2 -e "${1:-}"
 }
 
 die() {
-  local _msg=${1:-}
-  local _code=${2:-1} # default exit status 1
-  [[ -z $_msg ]] || msg "$_msg"
-  exit "$_code"
+    local _msg=${1:-}
+    local _code=${2:-1} # default exit status 1
+    [[ -z $_msg ]] || msg "$_msg"
+    exit "$_code"
 }
 
 msg_to_secbox_sessions() {
@@ -185,7 +185,7 @@ alias psc='secbox osc -A pbs'
 alias isc='f(){ if [[ \"\$@\"  =~ \".*omg.*\" ]]; then
                 secbox --sshfs osc -A ibs "\$@";
               else
-                secbox osc -A ibs "\$@";
+                  secbox osc -A ibs "\$@";
               fi; }; f'
 alias is_maintained='secbox is_maintained'
 alias quilt='secbox squilt'
