@@ -77,7 +77,7 @@ EOF
 print_logo() {
     msg "${red}\
                 _
-    ___ ___ ___| |_ ___ _ _ 
+    ___ ___ ___| |_ ___ _ _
    |_ -| -_|  _| . | . |_'_|
    |___|___|___|___|___|_,_|
         ${no_format}"
@@ -359,7 +359,7 @@ fuse_access() {
         local _gorup=$(stat -L -c "%g" /dev/fuse)
         if [[ $_group_permission =~ ^rw.$ ]]; then
             # /dev/fuse is usable by group users
-            local _g 
+            local _g
             for _g in $(id -G); do
                 [[ "${_g}" == "${_gorup}" ]] && return # if I'm part of that group (OK)
             done
@@ -598,7 +598,7 @@ secbox_exec() {
 
 secbox_destroy(){
     secbox_container_exists || die "${orange}[*]${no_format} ${container} does not exist"
-    
+
     print_logo
 
     # -f bypasses the interactive prompt
@@ -629,7 +629,7 @@ secbox_destroy(){
         msg "${green}[.]${no_format} ${container} container deleted"
         # If -i flag exists, then remove image used by the deleted container
         if [[ -n "${_image_id:-}" ]] && [[ "${1:-}" == "-i" ]]; then
-            podman image rm "${registry}/${image_name}:${_image_id:-}" > /dev/null 2>&1 && 
+            podman image rm "${registry}/${image_name}:${_image_id:-}" > /dev/null 2>&1 &&
                 msg "${green}[.]${no_format} ${container} image deleted"
         fi
     else
@@ -669,7 +669,7 @@ main() {
     https://github.com/containers/podman/blob/master/docs/tutorials/rootless_tutorial.md"
         fi
     fi
-    
+
     sshfs_flag=''
     nfs_flag=''
 
