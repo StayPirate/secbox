@@ -241,13 +241,13 @@ suse_internal_network() {
 
 secbox_instances_using_nfs() {
     local _instances=0
-    _instances=$(ps -xo pid,cmd | grep -v grep | grep -v $$ | grep -E "secbox.* --nfs" | wc -l)
+    _instances=$(pgrep --count --full "secbox.* --nfs")
     echo "$_instances"
 }
 
 secbox_instances_using_sshfs() {
     local _instances=0
-    _instances=$(ps -xo pid,cmd | grep -v grep | grep -v $$ | grep -E "secbox.* --sshfs" | wc -l)
+    _instances=$(pgrep --count --full "secbox.* --sshfs")
     echo "$_instances"
 }
 
