@@ -182,7 +182,7 @@ aliases() {
 ### OBS/IBS/PBS
 alias osc='secbox osc'
 alias psc='secbox osc -A pbs'
-alias isc='f(){ if [[ \"\$@\"  =~ \"omg\" ]]; then
+alias isc='f(){ if [[ \"\$@\"  =~ \".*omg.*\" ]]; then
                 secbox --sshfs osc -A ibs "\$@";
               else
                 secbox osc -A ibs "\$@";
