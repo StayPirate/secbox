@@ -112,7 +112,7 @@ cleanup() {
     if [[ -n ${nfs_flag:-} ]]; then
         if nfs_is_mounted; then
             # Check if a parallel secbox instance is using nfs, if yes do not umount exports
-            if [[ $(secbox_instances_using_nfs) -le 2 ]]; then
+            if [[ $(secbox_instances_using_nfs) -le 3 ]]; then
                 nfs_umount_all &&
                     msg_to_secbox_sessions "==== Another ${script_name} instance has umounted the nfs exports in /mounts ===="
             fi
@@ -123,7 +123,7 @@ cleanup() {
     if [[ -n ${sshfs_flag:-} ]]; then
         if sshfs_is_mounted; then
             # Check if a parallel secbox instance is using sshfs, if yes do not umount
-            if [[ $(secbox_instances_using_sshfs) -le 2 ]]; then
+            if [[ $(secbox_instances_using_sshfs) -le 3 ]]; then
                 sshfs_umount &&
                     msg_to_secbox_sessions "==== Another ${script_name} instance has umounted wotan:/mounts in /mounts ===="
             fi
