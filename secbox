@@ -446,7 +446,8 @@ create_container() {
                             --network host \
                             -v ${tmp_dir}:${tmp_dir} \
                             -v ${HOME}:${HOME} \
-                            -w ${HOME}"
+                            -w ${HOME} \
+                            -e LANG=${LANG}"
 
     # SYS_ADMIN capabilities are added to use FUSE from the container in order to mount sshfs, keep in mind
     # that this is a rootless container, hence not all SYS_ADMIN capabilites are available from the container
