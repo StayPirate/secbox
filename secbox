@@ -183,9 +183,9 @@ aliases() {
 alias osc='secbox osc'
 alias psc='secbox osc -A pbs'
 alias isc='f(){ if [[ \"\$@\"  =~ \".*omg.*\" ]]; then
-                secbox --sshfs osc -A ibs "\$@";
+                secbox --sshfs osc -A https://api.suse.de/ "\$@";
               else
-                  secbox osc -A ibs "\$@";
+                  secbox osc -A https://api.suse.de/ "\$@";
               fi; }; f'
 alias is_maintained='secbox is_maintained'
 alias quilt='secbox squilt'
@@ -449,6 +449,8 @@ create_container() {
                             -w ${HOME} \
                             -e LANG=${LANG}"
 
+    [[ "$tmp_dir" != "/tmp" ]] && _podman_cmdline="${_podman_cmdline} -v /tmp:/tmp"
+
     # SYS_ADMIN capabilities are added to use FUSE from the container in order to mount sshfs, keep in mind
     # that this is a rootless container, hence not all SYS_ADMIN capabilites are available from the container
     if fuse_access; then
@@ -530,7 +532,7 @@ pull_image() {
     suse_internal_network || return
     local _upstream=$(upstream_image_version)
     if podman pull "${registry}/${image_name}:${_upstream:-}" >/dev/null 2>&1; then
-        msg "${green}[*]${no_format} ${container} v.${_upstream:-} downloaded"
+        msg "${green}[*]${no_format} ${registry}/${image_name} v.${_upstream:-} downloaded"
     else
         msg "${red}[!]${no_format} canno pull the image"
         return 1
