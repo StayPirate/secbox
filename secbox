@@ -542,7 +542,9 @@ pull_image() {
 }
 
 update_image() {
+    local _upstream=$(upstream_image_version)
     read -ep "[.] An update is available, do you want to update the container now? [Y/n] " -n 1 -r
+    msg "Changelog: https://gitlab.suse.de/security/secbox-image/-/tags/v${_upstream}"
     if [[ ! $REPLY =~ ^[Nn]$ ]]; then
         if pull_image; then
             if secbox_container_exists; then
