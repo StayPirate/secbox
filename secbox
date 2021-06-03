@@ -194,8 +194,10 @@ alias oscb='osc build --ccache --cpio-bulk-download --download-api-only'
 alias bugzilla='secbox bugzilla'
 
 ### Internal Tools
-alias foodchain='secbox --sshfs foodchain \"\$@\"'
-alias tel='secbox --sshfs tel \"\$@\"' \
+alias foodchain='secbox --sshfs foodchain'
+alias tel='secbox --sshfs tel'
+alias create_archives_db='secbox --sshfs create_archives_db'
+alias query_archives_db='secbox query_archives_db'
 "
 }
 
