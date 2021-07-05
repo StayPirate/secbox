@@ -192,6 +192,9 @@ alias quilt='secbox squilt'
 alias oscsd='osc service localrun download_files'
 alias oscb='osc build --ccache --cpio-bulk-download --download-api-only'
 alias bugzilla='secbox bugzilla'
+# Which package depends on SUSE:SLE-12:GA/Botan?
+# isc whatdependson SUSE:SLE-12:GA Botan standard x86_64
+alias dep_on='isc whatdependson'
 
 ### UM: Kernel updates
 alias prepare-submission='secbox --sshfs prepare-submission.rb'
@@ -201,6 +204,7 @@ alias foodchain='secbox --sshfs foodchain'
 alias tel='secbox --sshfs tel'
 alias create_archives_db='secbox --sshfs create_archives_db'
 alias query_archives_db='secbox query_archives_db'
+alias mtk='secbox --sshfs mtk'
 "
 }
 
