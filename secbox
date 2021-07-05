@@ -54,7 +54,7 @@ For more information: https://github.com/StayPirate/secbox
 
 Available options:
 
---sshfs         Makes wotan:/mounts available to the container.
+--sshfs         Makes wotan:/mounts and wotan:/suse available to the container.
                 In order to works you should be able to access wotan.suse.de via ssh
                 from your host system by simply run 'ssh wotan', without interaction
                 You can find an example stanza in the README.md of this project.
@@ -192,6 +192,9 @@ alias quilt='secbox squilt'
 alias oscsd='osc service localrun download_files'
 alias oscb='osc build --ccache --cpio-bulk-download --download-api-only'
 alias bugzilla='secbox bugzilla'
+
+### UM: Kernel updates
+alias prepare-submission='secbox --sshfs prepare-submission.rb'
 
 ### Internal Tools
 alias foodchain='secbox --sshfs foodchain'
@@ -335,6 +338,7 @@ sshfs_exists() {
 
 sshfs_is_mounted() {
     podman container exec $container mount | grep "on /mounts type fuse.sshfs" > /dev/null 2>&1 || return 1
+    podman container exec $container mount | grep "on /suse type fuse.sshfs" > /dev/null 2>&1 || return 1
 }
 
 sshfs_mount() {
@@ -345,11 +349,15 @@ sshfs_mount() {
 
     podman container exec -d $container mkdir -p /mounts > /dev/null 2>&1
     podman >/dev/null 2>&1 container exec -d $container sshfs -o nonempty,ro,StrictHostKeyChecking=no,compression=yes wotan:/mounts /mounts
+    podman container exec -d $container mkdir -p /mounts > /dev/null 2>&1
+    podman >/dev/null 2>&1 container exec -d $container sshfs -o nonempty,ro,StrictHostKeyChecking=no,compression=yes wotan:/suse   /suse
 }
 
 sshfs_umount() {
     podman container exec -d $container fusermount -uz /mounts > /dev/null 2>&1 ||
         msg "${orange}[*]${no_format} ${container} cannot umount sshfs mountpoint: /mounts"
+    podman container exec -d $container fusermount -uz /suse > /dev/null 2>&1 ||
+        msg "${orange}[*]${no_format} ${container} cannot umount sshfs mountpoint: /suse"
 }
 
 fuse_access() {
