@@ -42,4 +42,8 @@ If you encotuner issues, try to delete the container and create once again via `
 
 ## Aliases
 
-`secbox --alias` provides some basic aliases that you can add to your `~/.bashrc`. If you create other useful aliases don't be shy and submit them via PR, I'll be glad to add them.
+`secbox --alias` provides suggested aliases, just add the following to `~/.bashrc` or `~/.zshrc`.
+
+    eval "$(secbox --alias)"
+
+This way you'll get automatically updated aliases when they are updated in the secbox package. If you create useful aliases don't be shy and submit them via PR, I'll be glad to merge it.
