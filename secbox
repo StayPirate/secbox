@@ -198,6 +198,8 @@ alias dep_on='isc whatdependson'
 
 ### UM: Kernel updates
 alias prepare-submission='secbox --sshfs prepare-submission.rb'
+alias prepare-kgraft='secbox --sshfs prepare-kgraft.rb'
+alias kernel-livepatch-signing-email-for-autobuild='secbox kernel-livepatch-signing-email-for-autobuild.py'
 
 ### Internal Tools
 alias foodchain='secbox --sshfs foodchain'
@@ -205,6 +207,10 @@ alias tel='secbox --sshfs tel'
 alias create_archives_db='secbox --sshfs create_archives_db'
 alias query_archives_db='secbox query_archives_db'
 alias mtk='secbox --sshfs mtk'
+
+# bz-login prompts an interactive login and set a local token for subsequent queries
+# The token can be found in ~/.cache/python-bugzilla/bugzillatoken
+alias bz-login='bugzilla --bugzilla https://bugzilla.suse.com login'
 "
 }
 
