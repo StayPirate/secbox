@@ -250,7 +250,7 @@ suse_internal_network() {
 
     for _address in "${_know_internal_addresses[@]}"; do
         # Fail at first connection that can't be estabilished
-        (echo > /dev/tcp/$_address) >/dev/null 2>&1 || return
+        timeout 1 sh -c "echo > /dev/tcp/${_address} >/dev/null 2>&1" || return
     done
 }
 
@@ -397,11 +397,6 @@ fuse_access() {
 }
 
 mount_remote_volumes() {
-    suse_internal_network || {
-        msg "${orange}[*]${no_format} can't use NFS, are you connected to the SUSE network?"
-        return 1
-    }
-
     [[ -n $nfs_flag && -n $sshfs_flag ]] && {
         die "[!] Options --sshfs and --nfs are mutual exclusivity, pick one of the two"
     }
@@ -725,10 +720,9 @@ main() {
         shift
     done
 
-    mount_remote_volumes
-
     if suse_internal_network; then
         update_available && update_image
+        mount_remote_volumes
     fi
 
     if container_is_not_running; then
