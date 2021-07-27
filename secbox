@@ -86,6 +86,7 @@ print_logo() {
 declare -r tmp_dir=${XDG_RUNTIME_DIR:-/tmp}
 declare -r container="secbox"
 declare -r script_name=$(basename "${BASH_SOURCE[0]}")
+declare -r resolv_conf="${tmp_dir}/${container}-resolv.conf"
 declare -r registry="registry.suse.de"
 declare -r registry_api="https://${registry}/v2/"
 declare -r image_name="non_public/maintenance/security/container/containers/secbox"
@@ -459,6 +460,8 @@ create_container() {
                             --userns=keep-id \
                             -u $(id -u) \
                             --network host \
+                            --dns=none \
+                            -v ${resolv_conf}:/etc/resolv.conf:ro \
                             -v ${tmp_dir}:${tmp_dir} \
                             -v ${HOME}:${HOME} \
                             -w ${HOME} \
@@ -613,6 +616,20 @@ container_is_not_running() {
     # Toggled return value
 }
 
+sync_name_resolvers() {
+    # I want the container resolv.conf reflect the one in the host. This would allow containerized binaries
+    # to resolve network resources in case the host resolvers are changed.
+    # An easiest solution would be to bind mount /etc/resolv.conf, but unfortunately NetworkManager replace
+    # this file instead of updating it in place, which in turn breaks the bind mount.
+    # This function is intended to maintain a custom file with the same content of the host's resolv.conf
+    #
+    # For more info: https://github.com/containers/podman/issues/11042
+    #                https://github.com/containers/podman/issues/10026
+    #                https://github.com/StayPirate/secbox/issues/5
+
+    cat /etc/resolv.conf > ${resolv_conf}
+}
+
 secbox_exec() {
     # Podman misbehaves when pipes are involved, as reported here
     # https://github.com/containers/podman/issues/9718#issuecomment-799925847
@@ -666,6 +683,8 @@ secbox_destroy(){
         msg "${red}[!]${no_format} ${container} container cannot be deleted"
         return 1
     fi
+
+    [ -f ${resolv_conf} ] && rm -f ${resolv_conf}
 }
 
 secbox_root() {
@@ -719,6 +738,8 @@ main() {
         esac
         shift
     done
+
+    sync_name_resolvers
 
     if suse_internal_network; then
         update_available && update_image
