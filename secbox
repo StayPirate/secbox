@@ -552,7 +552,7 @@ pull_image() {
     if podman pull "${registry}/${image_name}:${_upstream:-}" >/dev/null 2>&1; then
         msg "${green}[*]${no_format} ${registry}/${image_name} v.${_upstream:-} downloaded"
     else
-        msg "${red}[!]${no_format} canno pull the image"
+        msg "${red}[!]${no_format} cannot pull the image"
         return 1
     fi
 }
