@@ -627,7 +627,7 @@ sync_name_resolvers() {
     #                https://github.com/containers/podman/issues/10026
     #                https://github.com/StayPirate/secbox/issues/5
 
-    cat /etc/resolv.conf > ${resolv_conf}
+    cat /etc/resolv.conf > "${resolv_conf}"
 }
 
 secbox_exec() {
@@ -684,7 +684,7 @@ secbox_destroy(){
         return 1
     fi
 
-    [ -f ${resolv_conf} ] && rm -f ${resolv_conf}
+    [ -f "${resolv_conf}" ] && rm -f "${resolv_conf}"
 }
 
 secbox_root() {
