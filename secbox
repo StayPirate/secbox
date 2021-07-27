@@ -90,8 +90,8 @@ declare -r registry="registry.suse.de"
 declare -r registry_api="https://${registry}/v2/"
 declare -r image_name="non_public/maintenance/security/container/containers/secbox"
 declare -r container_unit="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/${container}.service"
-declare -r local_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/secbox"
-declare -r local_data_dir="${XDG_DATA_HOME:-$HOME/.local/share}/secbox"
+declare -r local_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/${container}"
+declare -r local_data_dir="${XDG_DATA_HOME:-$HOME/.local/share}/${container}"
 declare -r nfs_volumes_dir="${local_data_dir}/volumes"
 declare -ar nfs_shares=(
 ### address:/share,mountpoint,nfs_version
@@ -180,33 +180,33 @@ msg_to_secbox_sessions() {
 aliases() {
     echo "\
 ### OBS/IBS/PBS
-alias osc='secbox osc'
-alias psc='secbox osc -A pbs'
+alias osc='${script_name} osc'
+alias psc='${script_name} osc -A pbs'
 alias isc='f(){ if [[ \"\$@\"  =~ \".*omg.*\" ]]; then
-                secbox --sshfs osc -A https://api.suse.de/ "\$@";
+                ${script_name} --sshfs osc -A https://api.suse.de/ "\$@";
               else
-                  secbox osc -A https://api.suse.de/ "\$@";
+                  ${script_name} osc -A https://api.suse.de/ "\$@";
               fi; }; f'
-alias is_maintained='secbox is_maintained'
-alias quilt='secbox squilt'
+alias is_maintained='${script_name} is_maintained'
+alias quilt='${script_name} squilt'
 alias oscsd='osc service localrun download_files'
 alias oscb='osc build --ccache --cpio-bulk-download --download-api-only'
-alias bugzilla='secbox bugzilla'
+alias bugzilla='${script_name} bugzilla'
 # Which package depends on SUSE:SLE-12:GA/Botan?
 # isc whatdependson SUSE:SLE-12:GA Botan standard x86_64
 alias dep_on='isc whatdependson'
 
 ### UM: Kernel updates
-alias prepare-submission='secbox --sshfs prepare-submission.rb'
-alias prepare-kgraft='secbox --sshfs prepare-kgraft.rb'
-alias kernel-livepatch-signing-email-for-autobuild='secbox kernel-livepatch-signing-email-for-autobuild.py'
+alias prepare-submission='${script_name} --sshfs prepare-submission.rb'
+alias prepare-kgraft='${script_name} --sshfs prepare-kgraft.rb'
+alias kernel-livepatch-signing-email-for-autobuild='${script_name} kernel-livepatch-signing-email-for-autobuild.py'
 
 ### Internal Tools
-alias foodchain='secbox --sshfs foodchain'
-alias tel='secbox --sshfs tel'
-alias create_archives_db='secbox --sshfs create_archives_db'
-alias query_archives_db='secbox query_archives_db'
-alias mtk='secbox --sshfs mtk'
+alias foodchain='${script_name} --sshfs foodchain'
+alias tel='${script_name} --sshfs tel'
+alias create_archives_db='${script_name} --sshfs create_archives_db'
+alias query_archives_db='${script_name} query_archives_db'
+alias mtk='${script_name} --sshfs mtk'
 
 # bz-login prompts an interactive login and set a local token for subsequent queries
 # The token can be found in ~/.cache/python-bugzilla/bugzillatoken
@@ -256,19 +256,19 @@ suse_internal_network() {
 
 secbox_instances_using_nfs() {
     local _instances=0
-    _instances=$(pgrep --count --full "secbox.* --nfs")
+    _instances=$(pgrep --count --full "${container}.* --nfs")
     echo "$_instances"
 }
 
 secbox_instances_using_sshfs() {
     local _instances=0
-    _instances=$(pgrep --count --full "secbox.* --sshfs")
+    _instances=$(pgrep --count --full "${container}.* --sshfs")
     echo "$_instances"
 }
 
 other_secbox_instances() {
     local _instances=0
-    _instances=$(pgrep --count --full "podman .*secbox")
+    _instances=$(pgrep --count --full "podman .*${container}")
     echo "$_instances"
 }
 
@@ -452,7 +452,7 @@ create_container() {
     #  - Access D-Bus session socket
     #    * This is used by osc to query the secret service provider to get creds to login to OBS instances
     #  - Folders created via mkcd (alias) can be accessed from the container, hence I can use them with its tools
-    #    * mkcd: https://github.com/StayPirate/dotfiles/blob/7608e8ad66f8c13dc57fb49ed0ccf2dd7a04ae5a/.zshrc#L118
+    #    * mkcd: https://github.com/StayPirate/dotfiles/blob/04b556b42df2d2a31ffee7247897c7b3229c7675/.zshrc#L117
 
     local _podman_cmdline="podman container create \
                             --name ${container} \
@@ -626,14 +626,14 @@ secbox_destroy(){
     secbox_container_exists || die "${orange}[*]${no_format} ${container} does not exist"
 
     if [[ $(other_secbox_instances) -gt 0 ]]; then
-        die "${orange}[*]${no_format} Destruction aborted: other secbox instances are using the container"
+        die "${orange}[*]${no_format} Destruction aborted: other ${script_name} instances are using the container"
     fi
 
     print_logo
 
     # -f bypasses the interactive prompt
     if [[ "${1:-}" != "-f" ]]; then
-        read -ep "[.] Do you really want to destroy secbox [y/N] " -n 1 -r
+        read -ep "[.] Do you really want to destroy ${container} [y/N] " -n 1 -r
         [[ $REPLY =~ ^[Yy]$ ]] || die "${orange}[*]${no_format} Destruction aborted."
     else
         shift
@@ -655,7 +655,7 @@ secbox_destroy(){
     fi
 
     local _image_id=$(local_image_container_version) # Get the container's image id
-    if podman container rm -f secbox > /dev/null 2>&1; then
+    if podman container rm -f ${container} > /dev/null 2>&1; then
         msg "${green}[.]${no_format} ${container} container deleted"
         # If -i flag exists, then remove image used by the deleted container
         if [[ -n "${_image_id:-}" ]] && [[ "${1:-}" == "-i" ]]; then
@@ -673,7 +673,7 @@ secbox_root() {
 
     msg "${red}"
     echo -e "    !!!\t                          ~ Be CaReFuL ~\t!!!
-    !!!\tSecbox is a rootless container, that means this root user is mapped\t!!!
+    !!!\t${container} is a rootless container, that means this root user is mapped\t!!!
     !!!\twith your host $USER account. While you can install any package\t!!!
     !!!\tor change any container's file, DO NOT FORGET that your host-user's\t!!!
     !!!\tHOME directory is shared with this container. Any change performed\t!!!
