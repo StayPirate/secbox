@@ -183,11 +183,7 @@ aliases() {
 ### OBS/IBS/PBS
 alias osc='${script_name} osc'
 alias psc='${script_name} osc -A pbs'
-alias isc='f(){ if [[ \"\$@\"  =~ \".*omg.*\" ]]; then
-                ${script_name} --sshfs osc -A https://api.suse.de/ "\$@";
-              else
-                  ${script_name} osc -A https://api.suse.de/ "\$@";
-              fi; }; f'
+alias isc='${script_name} osc -A https://api.suse.de'
 alias is_maintained='${script_name} is_maintained'
 alias quilt='${script_name} squilt'
 alias oscsd='osc service localrun download_files'
@@ -697,7 +693,7 @@ secbox_root() {
     !!!\tor change any container's file, DO NOT FORGET that your host-user's\t!!!
     !!!\tHOME directory is shared with this container. Any change performed\t!!!
     !!!\tin /home/$USER is reflected to your host filesystem.\t!!!
-    !!!\tIn case you messed up the container, don't worry! Just destroy and\t!!!
+    !!!\tIn case you messed up the container, DON'T PANIC! Just destroy and\t!!!
     !!!\trecreate it '${container} --destroy' and '${container} echo Hello World'\t!!!
     !!!\t                          ~ Be CaReFuL ~\t!!!" | column -t -s $'\t'
     msg "${no_format}"
