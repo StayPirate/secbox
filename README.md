@@ -1,21 +1,25 @@
 # Secbox
 
+<p align="center">
+  <img src="https://i.imgur.com/m59i52q.png" height="130" width="130" alt="Mr MeeSeeks box"/>
+</p>
+
 TODO: description
 
 - [Installation](#installation)
   - [OpenSUSE](#OpenSUSE-Leap-15.2--15.3--Tumbleweed)
   - [Git](#Git)
 - [Configuration](#configuration)
-  - [Aliases](#Enable-secbox-via-aliases)
+  - [Enable](#Enable-secbox)
   - [Network resources](#Ensure-network-resources-access)
-- [Test it](#test-it)
+- [Try it](#try-it)
 - [Want to know more?](#want-to-know-more)
   - [Why](#why)
   - [Components](#Components)
   - [Break it](#Break-it-Dont-be-afraid,-it's-just-a-container)
   - [Reset button](#Reset-button)
   - [Make permanent changes](#Make-permanent-changes)
-  - [Use of the mount options](#Use-of-the-mount-options)
+  - [Network resources - Explained](#Use-of-the-mount-options)
 
 ## Installation
 
@@ -29,27 +33,30 @@ TODO: description
 
  * Git
 
-        git clone https://github.com/StayPirate/secbox.git
-        export PATH=$PATH:$(pwd)/secbox
+        git clone https://github.com/StayPirate/secbox.git && export PATH=$PATH:$(pwd)/secbox
 
 ## Configuration
- * ### **Enable secbox via aliases**
+ * ### **Enable secbox**
 
-    Secbox is mainly executed through aliases. For instance, to run the containerized tool `osc`, you need to run `secbox osc`. A set of commonly used aliases are provided via the `--alias` cmdline option. This is meant to automatically load aliases by adding the following command to your favorite shell rc file. (Eg. `~/.bashrc` , `~/.zshrc`)
+    Secbox is mainly executed through aliases. For instance: in order to run the *containerized* tool `osc`, you need to execute `secbox osc`. A set of aliaese for the most commonly used tools are provided via the `secbox --alias` cmdline option. This is meant to automatically load aliases by simply adding the following to your favorite shell rc file. (`~/.bashrc` , `~/.zshrc`, etc.)
 
         eval "$(secbox --alias)"
 
-    This way if new aliases are added in an updated version of secbox, you will get automatically added without any action from your side. If you create more aliases don't be shy and submit them via a PR, I'll be glad to merge them.
+    That's a great way to also get any new alias automatically loaded within terminal sessions created after you'll have updated secbox. *If you create more aliases don't be shy and submit them via a PR, I'll be glad to merge them.*
 
  * ### **Ensure network resources access**
 
-    In order to get some of the internal tools properly work, secbox needs to make some remote folders available on specific mountpoints. Secbox supports two different protocols for that:
+    *This is not mandatory*, but if you wonna get the best experience it's important you know some tools are expecting network file system mounted in specific paths. To make them properly work secbox manages to make these network resources availabe in the right place. You only have to ensure that your host system can accesses them and authenticate if needed. Secbox supports two different protocols for that:
 
    1. NFS  
-      It can be triggered through the option `--nfs`, since mounting requires high privileges your user's passoword would be asked to try to escalate them and mount required nfs exports. A list of mounted exports is maintained within the [`nfs_shares` array](https://github.com/StayPirate/secbox/blob/master/secbox#L97-L107).
+      Can be triggered through the option `--nfs`, since `mount` requires high privileges, then you'll be prompted to input your user's password. A list of mounted exports is maintained with the [`nfs_shares` array](https://github.com/StayPirate/secbox/blob/master/secbox#L97-L107). I suggest using this option just in case the one described below cannot.
 
    2. SSHFS *(prefered)*  
-      A **better approach** is the `--sshfs` option. Secbox can use sshfs (no need to install sshfs in your host) to mount `wotan.suse.de:/mounts` in the right place within the container. In order to make this option works you need to configure your host to be able to access wotan just by running `ssh wotan`. That's can easily be accomplished throught a proper configured `~/.ssh/config`. If you have not yet configured your, then you could use the following stanza template:
+      A **better approach** is the `--sshfs` option. Secbox uses sshfs (no need to install sshfs in your host) to mount `wotan.suse.de:/mounts` and `wotan.suse.de:/suse` in the expected paths inside the container. In order to make this option working you need to configure your host to be able to access `wotan.suse.de` just by running
+
+          host> ssh wotan
+
+      That can easily be accomplished throught a properly configured `~/.ssh/config`. You could use the following stanza template:
 
           Host wotan
               HostName wotan.suse.de
@@ -57,9 +64,9 @@ TODO: description
               PreferredAuthentications publickey
               IdentityFile /path/to/your/key
 
-      In case you manage your ssh keys with the ssh-agent you can avoid the last line (IdentityFile) since secbox will automatically use ssh-agent to authenticate.
+      In case your ssh keys are manged by the ssh-agent, then you can avoid the last line *(IdentityFile)*, because secbox will automatically talk to the ssh-agent.
 
-      To check if your ssh setup is correct, try to access wotan issuing the command `ssh wotan`, you should get similar results:
+      To check if your ssh setup is fine, try to access wotan via `ssh wotan`:
 
             host> ssh wotan
             Last login: Fri Jul 30 06:32:42 2021 from 2620:113:80c0:8340::11f1
@@ -78,19 +85,18 @@ TODO: description
 
             <YOUR_USERNAME>@wotan:~>
 
-## Test it
+## Try it
 
-If you manage to take all the above steps you should now be able to use secbox! First of all, ensure your shell rc-script has been re-sourced (open a new shell, manually source it, or manually run `eval "$(secbox --alias)"`).
+If you successfully went through all the above steps you should now be able to use secbox! First of all, ensure your shell has sourced its updated rc-script (open a new shell, manually source it, or manually run `eval "$(secbox --alias)"`).
 
-Now it's time to check if scebox works as expected. Run `secbox echo Hello outside world, I\'m running inside the container.`
+It's time to check if scebox works as expected, try to run the following example:
 
     host> secbox echo Hello outside world, I\'m running inside the container.
     Hello outside world, I'm running inside the container.
 
+Since that's probably your first time running secbox the container will be automatically created, hence you will see some extra output.
 
-Since this is your first time running secbox, then the container will be automatically created, hence you will see some extra output.
-
-Keep in mind that well-designed containers are [ephemeral](https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#create-ephemeral-containers), and that's the case of [secbox-image](https://gitlab.suse.de/security/secbox-image), the container image under the secbox's hood. That's mean that you're free to destroy/replace the container at your will, nothing will change from your point of view. To make it easy you can use `secbox --destroy` to delete the currently running container.
+Keep in mind that well-designed containers are [ephemeral](https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#create-ephemeral-containers), and that's the case of [secbox-image](https://gitlab.suse.de/security/secbox-image) (the container image under secbox's hood). In other words you're free to destroy/replace your running container at your will, it is recreated as soon as secbox is called again and nothing will change from your point of view. Try `secbox --destroy -f` to delete the currently running container then re-run secbox, like: `secbox echo I\'m Mr. Meeseeks! Look at me!`.
 
 Last but not least, don't forget `secbox --help` is your friend.
 
@@ -222,7 +228,7 @@ Last but not least, don't forget `secbox --help` is your friend.
 
     It seems the cow can't say anything anymore, any existential question is over.
 
-    Of course, if `cowsay` is still installed inside the container, you can use it without entering into the container shell all the time. That's ascutally the strainght of secbox! Just run like this:
+    Let's reinstall `cowsay` inside the container and let's see something more. Of course you can use it without entering into the container with a shell all the time. That's ascutally the secbox's straightness! Just run like this:
 
         host> secbox cowsay Hi folks
          ----------
@@ -234,7 +240,7 @@ Last but not least, don't forget `secbox --help` is your friend.
                         ||----w |
                         ||     ||
 
-    The next step is to create an alias in the host, to use cowsay as it was installed inside the host system.
+    The missing step is creating an alias in the host and use cowsay as it's installed inside the host operating system itself. :)
 
         host> alias cowsay='secbox cowsay'
         host> cowsay Hi folks
@@ -256,7 +262,7 @@ Last but not least, don't forget `secbox --help` is your friend.
 
     TODO
 
- * ### Use of the mount options
+ * ### Network resources - Explained
 
     If you are wondering why there is not one but two way to automatically mount network resources, then keep reading.
 
