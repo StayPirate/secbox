@@ -3,7 +3,7 @@
 # shellcheck disable=SC2034
 set -u
 trap cleanup SIGINT SIGTERM ERR EXIT
-declare -r script_version="1.6"
+declare -r script_version="1.7"
 # -----------------------------------------------------------------------------
 #                     One tool to rule them all, one tool to containerize them
 #                   One tool to bring them all, and in the namespace bind them
@@ -69,6 +69,8 @@ Available options:
 --debug         Script debug mode
 --no-color      Turn off colored output
 --alias         Print a list of useful aliases, you can add it to your .bashrc
+--tty           Force interactive terminal
+--no-tty        Disable interactive terminal
 -h, --help      Print this help and exit
 -v, --version   Print component versions
 EOF
@@ -208,6 +210,9 @@ alias mtk='${script_name} --sshfs mtk'
 # bz-login prompts an interactive login and set a local token for subsequent queries
 # The token can be found in ~/.cache/python-bugzilla/bugzillatoken
 alias bz-login='bugzilla --bugzilla https://bugzilla.suse.com login'
+
+alias php='secbox php'
+alias phar='secbox phar'
 "
 }
 
@@ -631,7 +636,16 @@ secbox_exec() {
     # https://github.com/containers/podman/issues/9718#issuecomment-799925847
     # Credits to @giuseppe who suggested a clever workaround (_ti)
     ### tty 0<&1 &>/dev/null: use tty to test stdout instead of stdin :)
-    local _ti="-ti"; tty 0<&1 &>/dev/null || _ti=""
+
+    if [[ "$1" == "auto" ]]; then
+        local _ti="-ti"; tty 0<&1 &>/dev/null || _ti=""
+    elif [[ "$1" == "false" ]]; then
+        local _ti="";
+    elif [[ "$1" == "true" ]]; then
+        local _ti="-ti";
+    fi
+    shift
+
     podman container exec $_ti -w "$(pwd)" $container "$@"
 }
 
@@ -717,6 +731,7 @@ main() {
 
     sshfs_flag=''
     nfs_flag=''
+    tty='auto'
 
     while :; do
         case "${1:-}" in
@@ -729,6 +744,8 @@ main() {
             --alias) aliases; exit ;;
             --nfs) nfs_flag='true' ;;
             --sshfs) sshfs_flag='true' ;;
+            --no-tty) tty='false' ;;
+            --tty) tty='true' ;;
             -?*) die "${orange}Unknown option${no_format}: ${1:-}" 0 ;;
             *) break ;;
         esac
@@ -750,7 +767,7 @@ main() {
         enable_container_service || msg "${orange}[*]${no_format} Cannot enable ${container} service"
     fi
 
-    secbox_exec "$@"
+    secbox_exec "$tty" "$@"
 }
 
 main "$@"
