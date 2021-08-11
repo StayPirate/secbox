@@ -182,37 +182,43 @@ msg_to_secbox_sessions() {
 
 aliases() {
     echo "\
-### OBS/IBS/PBS
-alias osc='${script_name} osc'
-alias psc='${script_name} osc -A pbs'
-alias isc='${script_name} osc -A https://api.suse.de'
-alias is_maintained='${script_name} is_maintained'
-alias quilt='${script_name} squilt'
-alias oscsd='osc service localrun download_files'
-alias oscb='osc build --ccache --cpio-bulk-download --download-api-only'
-alias bugzilla='${script_name} bugzilla'
-# Which package depends on SUSE:SLE-12:GA/Botan?
-# isc whatdependson SUSE:SLE-12:GA Botan standard x86_64
-alias dep_on='isc whatdependson'
+if ! test -f /run/.containerenv; then
+    ########## NOT INSIDE THE CONTAINER ##########
+    ### OBS/IBS/PBS
+    alias osc='${script_name} osc'
+    alias psc='${script_name} osc -A pbs'
+    alias isc='${script_name} osc -A https://api.suse.de'
+    alias is_maintained='${script_name} is_maintained'
+    alias quilt='${script_name} squilt'
+    alias oscsd='osc service localrun download_files'
+    alias oscb='osc build --ccache --cpio-bulk-download --download-api-only'
+    alias bugzilla='${script_name} bugzilla'
+    # Which package depends on SUSE:SLE-12:GA/Botan?
+    # isc whatdependson SUSE:SLE-12:GA Botan standard x86_64
+    alias dep_on='isc whatdependson'
 
-### UM: Kernel updates
-alias prepare-submission='${script_name} --sshfs prepare-submission.rb'
-alias prepare-kgraft='${script_name} --sshfs prepare-kgraft.rb'
-alias kernel-livepatch-signing-email-for-autobuild='${script_name} kernel-livepatch-signing-email-for-autobuild.py'
+    ### UM: Kernel updates
+    alias prepare-submission='${script_name} --sshfs prepare-submission.rb'
+    alias prepare-kgraft='${script_name} --sshfs prepare-kgraft.rb'
+    alias kernel-livepatch-signing-email-for-autobuild='${script_name} kernel-livepatch-signing-email-for-autobuild.py'
 
-### Internal Tools
-alias foodchain='${script_name} --sshfs foodchain'
-alias tel='${script_name} --sshfs tel'
-alias create_archives_db='${script_name} --sshfs create_archives_db'
-alias query_archives_db='${script_name} query_archives_db'
-alias mtk='${script_name} --sshfs mtk'
+    ### Internal Tools
+    alias foodchain='${script_name} --sshfs foodchain'
+    alias tel='${script_name} --sshfs tel'
+    alias create_archives_db='${script_name} --sshfs create_archives_db'
+    alias query_archives_db='${script_name} query_archives_db'
+    alias mtk='${script_name} --sshfs mtk'
 
-# bz-login prompts an interactive login and set a local token for subsequent queries
-# The token can be found in ~/.cache/python-bugzilla/bugzillatoken
-alias bz-login='bugzilla --bugzilla https://bugzilla.suse.com login'
+    # bz-login prompts an interactive login and set a local token for subsequent queries
+    # The token can be found in ~/.cache/python-bugzilla/bugzillatoken
+    alias bz-login='bugzilla --bugzilla https://bugzilla.suse.com login'
 
-alias php='secbox php'
-alias phar='secbox phar'
+    alias php='secbox php'
+    alias phar='secbox phar'
+else
+    ########## INSIDE THE CONTAINER ##########
+    export PS1=\"\u@secbox \W> \"
+fi
 "
 }
 
@@ -252,7 +258,7 @@ suse_internal_network() {
 
     for _address in "${_know_internal_addresses[@]}"; do
         # Fail at first connection that can't be estabilished
-        timeout 1 sh -c "echo > /dev/tcp/${_address} >/dev/null 2>&1" || return
+        timeout 1 sh -c "echo > /dev/tcp/${_address}" >/dev/null 2>&1 || return
     done
 }
 
@@ -715,6 +721,17 @@ secbox_root() {
 }
 
 main() {
+
+    while :; do
+        case "${1:-}" in
+            -h | --help | help | "") print_help; exit ;;
+            -v | --version) print_version; exit ;;
+            --alias) aliases; exit ;;
+            *) break ;;
+        esac
+        shift
+    done
+
     setup_colors
 
     type podman >/dev/null 2>&1 ||
@@ -735,13 +752,10 @@ main() {
 
     while :; do
         case "${1:-}" in
-            -h | --help | help | "") print_help; exit ;;
-            -v | --version) print_version; exit ;;
             --debug) set -x ;;
             --destroy) secbox_destroy "${2:-}" "${3:-}"; exit ;;
             --root) secbox_root; exit ;;
             --no-color) no_color=1 && setup_colors ;;
-            --alias) aliases; exit ;;
             --nfs) nfs_flag='true' ;;
             --sshfs) sshfs_flag='true' ;;
             --no-tty) tty='false' ;;
