@@ -88,13 +88,13 @@ print_logo() {
 declare -r tmp_dir=${XDG_RUNTIME_DIR:-/tmp}
 declare -r container="secbox"
 declare -r script_name=$(basename "${BASH_SOURCE[0]}")
-declare -r resolv_conf="${tmp_dir}/${container}-resolv.conf"
+declare -r local_data_dir="${XDG_DATA_HOME:-$HOME/.local/share}/${container}"
+declare -r resolv_conf="${local_data_dir}/resolv.conf"
 declare -r registry="registry.suse.de"
 declare -r registry_api="https://${registry}/v2/"
 declare -r image_name="non_public/maintenance/security/container/containers/secbox"
-declare -r container_unit="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/${container}.service"
 declare -r local_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/${container}"
-declare -r local_data_dir="${XDG_DATA_HOME:-$HOME/.local/share}/${container}"
+declare -r container_unit="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/${container}.service"
 declare -r nfs_volumes_dir="${local_data_dir}/volumes"
 declare -ar nfs_shares=(
 ### address:/share,mountpoint,nfs_version
