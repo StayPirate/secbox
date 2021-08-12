@@ -90,6 +90,7 @@ declare -r container="secbox"
 declare -r script_name=$(basename "${BASH_SOURCE[0]}")
 declare -r local_data_dir="${XDG_DATA_HOME:-$HOME/.local/share}/${container}"
 declare -r resolv_conf="${local_data_dir}/resolv.conf"
+declare -r host_env="${local_data_dir}/host-env"
 declare -r registry="registry.suse.de"
 declare -r registry_api="https://${registry}/v2/"
 declare -r image_name="non_public/maintenance/security/container/containers/secbox"
@@ -106,6 +107,12 @@ declare -ar nfs_shares=(
     #"rufus.suse.de:/vol/work_users,/mounts/work_users,3"
     #"hilbert.suse.de:/built,/mounts/built,4.2"
     #"dust.suse.de:/unpacked,/mounts/unpacked,4.2"
+)
+declare -ar host_env_vars=(
+### List of environment variables to copy from the host at each run
+    "SSH_AUTH_SOCK"
+    "DBUS_SESSION_BUS_ADDRESS"
+    "LANG"
 )
 
 cleanup() {
@@ -471,8 +478,7 @@ create_container() {
                             -v ${resolv_conf}:/etc/resolv.conf:ro \
                             -v ${tmp_dir}:${tmp_dir} \
                             -v ${HOME}:${HOME} \
-                            -w ${HOME} \
-                            -e LANG=${LANG}"
+                            -w ${HOME}"
 
     [[ "$tmp_dir" != "/tmp" ]] && _podman_cmdline="${_podman_cmdline} -v /tmp:/tmp"
 
@@ -483,15 +489,6 @@ create_container() {
     else
         msg "${orange}[*]${no_format} fuse not available, --sshfs option will not work"
     fi
-
-    # If ssh-agent is configured, share it with the container (mainly used by sshfs)
-    [ -z "${SSH_AUTH_SOCK:-}" ] ||
-        _podman_cmdline="${_podman_cmdline} -e SSH_AUTH_SOCK=/ssh-agent \
-                                            -v ${SSH_AUTH_SOCK}:/ssh-agent"
-
-    # If Dbus-session exists, share it with the container (mainly used by osc)
-    [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] ||
-        _podman_cmdline="${_podman_cmdline} -e DBUS_SESSION_BUS_ADDRESS=\"${DBUS_SESSION_BUS_ADDRESS}\""
 
     # Create NFS mountpoints
     for _share in "${nfs_shares[@]}"; do                                # nfs.example.tld:/a/b,/mount/point,4.2
@@ -637,6 +634,17 @@ sync_name_resolvers() {
     cat /etc/resolv.conf > "${resolv_conf}"
 }
 
+sync_host_env() {
+    echo -n > ${host_env}
+
+    set +u
+    for env_var in "${host_env_vars[@]}"; do
+        echo -n "$env_var=" >> ${host_env}
+        eval "echo \$$env_var" >> ${host_env}
+    done
+    set -u
+}
+
 secbox_exec() {
     # Podman misbehaves when pipes are involved, as reported here
     # https://github.com/containers/podman/issues/9718#issuecomment-799925847
@@ -652,7 +660,7 @@ secbox_exec() {
     fi
     shift
 
-    podman container exec $_ti -w "$(pwd)" $container "$@"
+    podman container exec $_ti -w "$(pwd)" --env-file=${host_env} $container "$@"
 }
 
 secbox_destroy(){
@@ -701,6 +709,7 @@ secbox_destroy(){
     fi
 
     [ -f "${resolv_conf}" ] && rm -f "${resolv_conf}"
+    [ -f "${host_env}" ] && rm -f "${host_env}"
 }
 
 secbox_root() {
@@ -767,6 +776,7 @@ main() {
     done
 
     sync_name_resolvers
+    sync_host_env
 
     if suse_internal_network; then
         update_available && update_image
