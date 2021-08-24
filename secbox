@@ -3,7 +3,7 @@
 # shellcheck disable=SC2034
 set -u
 trap cleanup SIGINT SIGTERM ERR EXIT
-declare -r script_version="1.7"
+declare -r script_version="1.9"
 # -----------------------------------------------------------------------------
 #                     One tool to rule them all, one tool to containerize them
 #                   One tool to bring them all, and in the namespace bind them
@@ -189,7 +189,7 @@ msg_to_secbox_sessions() {
 
 aliases() {
     echo "\
-if ! test -f /run/.containerenv; then
+if [ -z \$secbox_container_id ] && [ ! -f /run/.containerenv ]; then
     ########## NOT INSIDE THE CONTAINER ##########
     ### OBS/IBS/PBS
     alias osc='${script_name} osc'
@@ -225,6 +225,7 @@ if ! test -f /run/.containerenv; then
 else
     ########## INSIDE THE CONTAINER ##########
     export PS1=\"\u@secbox \W> \"
+    alias secbox='echo You cannot execute ${script_name} inside the $container container; false'
 fi
 "
 }
@@ -475,6 +476,7 @@ create_container() {
                             -u $(id -u) \
                             --network host \
                             --dns=none \
+                            -v \"$(readlink -e "${BASH_SOURCE[0]}"):/usr/bin/secbox\" \
                             -v ${resolv_conf}:/etc/resolv.conf:ro \
                             -v ${tmp_dir}:${tmp_dir} \
                             -v ${HOME}:${HOME} \
@@ -631,17 +633,19 @@ sync_name_resolvers() {
     #                https://github.com/containers/podman/issues/10026
     #                https://github.com/StayPirate/secbox/issues/5
 
-    cat /etc/resolv.conf > "${resolv_conf}"
+    cat /etc/resolv.conf > "$resolv_conf"
 }
 
 sync_host_env() {
-    echo -n > ${host_env}
+    echo -n > "$host_env"
 
     set +u
     for env_var in "${host_env_vars[@]}"; do
-        echo -n "$env_var=" >> ${host_env}
-        eval "echo \$$env_var" >> ${host_env}
+        echo -n "$env_var=" >> "$host_env"
+        eval "echo \$$env_var" >> "$host_env"
     done
+    local container_id="$(podman container inspect ${container} | jq -r '.[] | .Id')"
+    echo "secbox_container_id=${container_id}" >> "$host_env"
     set -u
 }
 
@@ -660,7 +664,7 @@ secbox_exec() {
     fi
     shift
 
-    podman container exec $_ti -w "$(pwd)" --env-file=${host_env} $container "$@"
+    podman container exec $_ti -w "$(pwd)" --env-file="$host_env" $container "$@"
 }
 
 secbox_destroy(){
@@ -775,8 +779,8 @@ main() {
         shift
     done
 
-    sync_name_resolvers
-    sync_host_env
+    # The $resolv_conf file is required in order to create the container, because it's bind mounted.
+    echo -n > "$resolv_conf"
 
     if suse_internal_network; then
         update_available && update_image
@@ -790,6 +794,9 @@ main() {
     if systemd_service_is_disabled; then
         enable_container_service || msg "${orange}[*]${no_format} Cannot enable ${container} service"
     fi
+
+    sync_name_resolvers
+    sync_host_env
 
     secbox_exec "$tty" "$@"
 }
