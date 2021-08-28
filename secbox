@@ -785,7 +785,6 @@ main() {
 
     if suse_internal_network; then
         update_available && update_image
-        mount_remote_volumes
     fi
 
     if container_is_not_running; then
@@ -797,6 +796,10 @@ main() {
     fi
 
     sync_host_env
+
+    if suse_internal_network; then
+        mount_remote_volumes
+    fi
 
     secbox_exec "$tty" "$@"
 }
