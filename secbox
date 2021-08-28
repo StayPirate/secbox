@@ -374,9 +374,9 @@ sshfs_mount() {
     }
 
     podman container exec -d $container mkdir -p /mounts > /dev/null 2>&1
-    podman >/dev/null 2>&1 container exec -d $container sshfs -o nonempty,ro,StrictHostKeyChecking=no,compression=yes wotan:/mounts /mounts
-    podman container exec -d $container mkdir -p /mounts > /dev/null 2>&1
-    podman >/dev/null 2>&1 container exec -d $container sshfs -o nonempty,ro,StrictHostKeyChecking=no,compression=yes wotan:/suse   /suse
+    podman >/dev/null 2>&1 container exec --env-file="$host_env" -d $container sshfs -o nonempty,ro,StrictHostKeyChecking=no,compression=yes wotan:/mounts /mounts
+    podman container exec -d $container mkdir -p /suse > /dev/null 2>&1
+    podman >/dev/null 2>&1 container exec --env-file="$host_env" -d $container sshfs -o nonempty,ro,StrictHostKeyChecking=no,compression=yes wotan:/suse   /suse
 }
 
 sshfs_umount() {
@@ -730,7 +730,7 @@ secbox_root() {
     !!!\trecreate it '${container} --destroy' and '${container} echo Hello World'\t!!!
     !!!\t                          ~ Be CaReFuL ~\t!!!" | column -t -s $'\t'
     msg "${no_format}"
-    podman container exec -ti --user 0 $container bash
+    podman container exec --env-file="$host_env" -ti --user 0 $container bash
 }
 
 main() {
@@ -781,6 +781,7 @@ main() {
 
     # The $resolv_conf file is required in order to create the container, because it's bind mounted.
     echo -n > "$resolv_conf"
+    sync_name_resolvers
 
     if suse_internal_network; then
         update_available && update_image
@@ -795,7 +796,6 @@ main() {
         enable_container_service || msg "${orange}[*]${no_format} Cannot enable ${container} service"
     fi
 
-    sync_name_resolvers
     sync_host_env
 
     secbox_exec "$tty" "$@"
