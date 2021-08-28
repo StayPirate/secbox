@@ -210,8 +210,8 @@ if [ -z \$secbox_container_id ] && [ ! -f /run/.containerenv ]; then
     alias kernel-livepatch-signing-email-for-autobuild='${script_name} kernel-livepatch-signing-email-for-autobuild.py'
 
     ### Internal Tools
-    alias foodchain='${script_name} --sshfs foodchain'
-    alias tel='${script_name} --sshfs tel'
+    alias foodchain='${script_name} --sshfs --no-tty foodchain'
+    alias tel='${script_name} --sshfs --no-tty tel'
     alias create_archives_db='${script_name} --sshfs create_archives_db'
     alias query_archives_db='${script_name} query_archives_db'
     alias mtk='${script_name} --sshfs mtk'
