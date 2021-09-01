@@ -115,6 +115,21 @@ declare -ar host_env_vars=(
     "LANG"
 )
 
+create_base_structure() {
+    [[ -d "${local_config_dir}" ]] || mkdir -p "${local_config_dir}"
+    [[ -d "${local_data_dir}" ]] || mkdir -p "${local_data_dir}"
+    [[ -d "${nfs_volumes_dir}" ]] || mkdir -p "${nfs_volumes_dir}"
+    [[ -f "${resolv_conf}" ]] || echo -n > "$resolv_conf"
+    [[ -f "${host_env}" ]] || echo -n > "$host_env"
+}
+
+remove_base_structure() {
+    [[ -d "${local_data_dir}" ]] && rm -rf "${local_data_dir}"
+    [[ -d "${nfs_volumes_dir}" ]] && rm -rf "${nfs_volumes_dir}"
+    [[ -f "${resolv_conf}" ]] && rm "$resolv_conf"
+    [[ -f "${host_env}" ]] && rm "$host_env"
+}
+
 cleanup() {
     trap - SIGINT SIGTERM ERR EXIT
 
@@ -712,8 +727,9 @@ secbox_destroy(){
         return 1
     fi
 
-    [ -f "${resolv_conf}" ] && rm -f "${resolv_conf}"
-    [ -f "${host_env}" ] && rm -f "${host_env}"
+    # Do not delete the local file structure during an update, but
+    # only when the user intentionally use the --destroy flag
+    [[ "${FUNCNAME[1]}" != "update_image" ]] && remove_base_structure
 }
 
 secbox_root() {
@@ -779,8 +795,8 @@ main() {
         shift
     done
 
-    # The $resolv_conf file is required in order to create the container, because it's bind mounted.
-    echo -n > "$resolv_conf"
+    create_base_structure
+
     sync_name_resolvers
 
     if suse_internal_network; then
