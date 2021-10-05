@@ -47,6 +47,7 @@ declare -r script_version="1.9"
 print_help() {
     cat <<EOF
 Usage: ${script_name} [--debug] [-h] [-v] [--sshfs] [--destroy] [--root] \\
+                [--interactive|--no-interactive] [--tty|--no-tty] \\
                 [--no-color] [--nfs] [--alias] command [arg1 arg2...]
 
 A collection of needed tools for your daily work in the Security Team.
@@ -54,25 +55,27 @@ For more information: https://github.com/StayPirate/secbox
 
 Available options:
 
---sshfs         Makes wotan:/mounts and wotan:/suse available to the container.
-                In order to works you should be able to access wotan.suse.de via ssh
-                from your host system by simply run 'ssh wotan', without interaction
-                You can find an example stanza in the README.md of this project.
-                ${script_name} support ssh-agent out-of-the-box if it's configured
-                in the host system.
---nfs           Alternative to --sshfs, it makes some of the NFS exports available
-                to the container. --sshfs should be prefered.
---destroy       Destroy ${container} container and related components
-         [-i]   Also delete the container image
-         [-f]   Not interactive, [Y]es by default
---root          Enter the running container as root user. Container debug mode
---debug         Script debug mode
---no-color      Turn off colored output
---alias         Print a list of useful aliases, you can add it to your .bashrc
---tty           Force interactive terminal
---no-tty        Disable interactive terminal
--h, --help      Print this help and exit
--v, --version   Print component versions
+--sshfs          Makes wotan:/mounts and wotan:/suse available to the container.
+                 In order to works you should be able to access wotan.suse.de via ssh
+                 from your host system by simply run 'ssh wotan', without interaction
+                 You can find an example stanza in the README.md of this project.
+                 ${script_name} support ssh-agent out-of-the-box if it's configured
+                 in the host system.
+--nfs            Alternative to --sshfs, it makes some of the NFS exports available
+                 to the container. --sshfs should be prefered.
+--destroy        Destroy ${container} container and related components
+         [-i]    Also delete the container image
+         [-f]    Not interactive, [Y]es by default
+--root           Enter the running container as root user. Container debug mode
+--debug          Script debug mode
+--no-color       Turn off colored output
+--alias          Print a list of useful aliases, you can add it to your .bashrc
+--tty            Force terminal
+--no-tty         Disable terminal
+--interactive    Force interactive shell
+--no-interactive Disable interactive shell
+-h, --help       Print this help and exit
+-v, --version    Print component versions
 EOF
 }
 
@@ -211,7 +214,7 @@ if [ -z \$secbox_container_id ] && [ ! -f /run/.containerenv ]; then
     alias psc='${script_name} osc -A pbs'
     alias isc='${script_name} osc -A https://api.suse.de'
     alias is_maintained='${script_name} is_maintained'
-    alias quilt='${script_name} squilt'
+    alias quilt='${script_name} quilt'
     alias oscsd='osc service localrun download_files'
     alias oscb='osc build --ccache --cpio-bulk-download --download-api-only'
     alias bugzilla='${script_name} bugzilla'
@@ -225,8 +228,8 @@ if [ -z \$secbox_container_id ] && [ ! -f /run/.containerenv ]; then
     alias kernel-livepatch-signing-email-for-autobuild='${script_name} kernel-livepatch-signing-email-for-autobuild.py'
 
     ### Internal Tools
-    alias foodchain='${script_name} --sshfs --no-tty foodchain'
-    alias tel='${script_name} --sshfs --no-tty tel'
+    alias foodchain='${script_name} --sshfs --no-tty --no-interactive foodchain'
+    alias tel='${script_name} --sshfs --no-tty --no-interactive tel'
     alias create_archives_db='${script_name} --sshfs create_archives_db'
     alias query_archives_db='${script_name} query_archives_db'
     alias mtk='${script_name} --sshfs mtk'
@@ -237,6 +240,7 @@ if [ -z \$secbox_container_id ] && [ ! -f /run/.containerenv ]; then
 
     alias php='secbox php'
     alias phar='secbox phar'
+    alias sieveshell='secbox --no-tty sieveshell'
 else
     ########## INSIDE THE CONTAINER ##########
     export PS1=\"\u@secbox \W> \"
@@ -529,6 +533,7 @@ create_container() {
 start_container() {
     secbox_container_exists || {
         # If the container does not exist, create it
+        echo "${FUNCNAME[1]}"
         print_logo
         msg "${orange}[*]${no_format} ${container} container not found"
         create_container || {
@@ -670,16 +675,29 @@ secbox_exec() {
     # Credits to @giuseppe who suggested a clever workaround (_ti)
     ### tty 0<&1 &>/dev/null: use tty to test stdout instead of stdin :)
 
+    # Set if the tty should be set or not
+    # That can be forced with --tty or --no-tty
     if [[ "$1" == "auto" ]]; then
-        local _ti="-ti"; tty 0<&1 &>/dev/null || _ti=""
+        local _t="-t"; tty 0<&1 &>/dev/null || _ti=""
     elif [[ "$1" == "false" ]]; then
-        local _ti="";
+        local _t="";
     elif [[ "$1" == "true" ]]; then
-        local _ti="-ti";
+        local _t="-t";
     fi
     shift
 
-    podman container exec $_ti -w "$(pwd)" --env-file="$host_env" $container "$@"
+    # Set if the shell should be interactive or not
+    # That can be forced with --interactive or --no-interactive
+    if [[ "$1" == "auto" ]]; then
+        local _i="-i"; tty 0<&1 &>/dev/null || _ti=""
+    elif [[ "$1" == "false" ]]; then
+        local _i="";
+    elif [[ "$1" == "true" ]]; then
+        local _i="-i";
+    fi
+    shift
+
+    podman container exec $_t $_i -w "$(pwd)" --env-file="$host_env" $container "$@"
 }
 
 secbox_destroy(){
@@ -778,6 +796,7 @@ main() {
     sshfs_flag=''
     nfs_flag=''
     tty='auto'
+    interactive='auto'
 
     while :; do
         case "${1:-}" in
@@ -789,6 +808,8 @@ main() {
             --sshfs) sshfs_flag='true' ;;
             --no-tty) tty='false' ;;
             --tty) tty='true' ;;
+            --no-interactive) interactive='false' ;;
+            --interactive) interactive='true' ;;
             -?*) die "${orange}Unknown option${no_format}: ${1:-}" 0 ;;
             *) break ;;
         esac
@@ -817,7 +838,7 @@ main() {
         mount_remote_volumes
     fi
 
-    secbox_exec "$tty" "$@"
+    secbox_exec "$tty" "$interactive" "$@"
 }
 
 main "$@"
