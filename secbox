@@ -533,7 +533,6 @@ create_container() {
 start_container() {
     secbox_container_exists || {
         # If the container does not exist, create it
-        echo "${FUNCNAME[1]}"
         print_logo
         msg "${orange}[*]${no_format} ${container} container not found"
         create_container || {
