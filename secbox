@@ -678,7 +678,7 @@ secbox_exec() {
     # Set if the tty should be set or not
     # That can be forced with --tty or --no-tty
     if [[ "$1" == "auto" ]]; then
-        local _t="-t"; tty 0<&1 &>/dev/null || _ti=""
+        local _t="-t"; tty 0<&1 &>/dev/null || _t=""
     elif [[ "$1" == "false" ]]; then
         local _t="";
     elif [[ "$1" == "true" ]]; then
@@ -689,7 +689,7 @@ secbox_exec() {
     # Set if the shell should be interactive or not
     # That can be forced with --interactive or --no-interactive
     if [[ "$1" == "auto" ]]; then
-        local _i="-i"; tty 0<&1 &>/dev/null || _ti=""
+        local _i="-i"; tty 0<&1 &>/dev/null || _i=""
     elif [[ "$1" == "false" ]]; then
         local _i="";
     elif [[ "$1" == "true" ]]; then
