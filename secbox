@@ -241,7 +241,7 @@ if [ -z \$secbox_container_id ] && [ ! -f /run/.containerenv ]; then
     alias php='secbox php'
     alias phar='secbox phar'
     alias sieveshell='secbox --no-tty sieveshell'
-    alias secret-tool='secbox secret-tool'
+    alias secret-tool='secbox --no-tty secret-tool'
 else
     ########## INSIDE THE CONTAINER ##########
     export PS1=\"\u@secbox \W> \"
