@@ -48,34 +48,36 @@ print_help() {
     cat <<EOF
 Usage: ${script_name} [--debug] [-h] [-v] [--sshfs] [--destroy] [--root] \\
                 [--interactive|--no-interactive] [--tty|--no-tty] \\
-                [--no-color] [--nfs] [--alias] command [arg1 arg2...]
+                [--no-color] [--nfs] [--alias] command [arg1 arg2...] \\
+                [--update-container]
 
 A collection of needed tools for your daily work in the Security Team.
 For more information: https://github.com/StayPirate/secbox
 
 Available options:
 
---sshfs          Makes wotan:/mounts and wotan:/suse available to the container.
-                 In order to works you should be able to access wotan.suse.de via ssh
-                 from your host system by simply run 'ssh wotan', without interaction
-                 You can find an example stanza in the README.md of this project.
-                 ${script_name} support ssh-agent out-of-the-box if it's configured
-                 in the host system.
---nfs            Alternative to --sshfs, it makes some of the NFS exports available
-                 to the container. --sshfs should be prefered.
---destroy        Destroy ${container} container and related components
-         [-i]    Also delete the container image
-         [-f]    Not interactive, [Y]es by default
---root           Enter the running container as root user. Container debug mode
---debug          Script debug mode
---no-color       Turn off colored output
---alias          Print a list of useful aliases, you can add it to your .bashrc
---tty            Force terminal
---no-tty         Disable terminal
---interactive    Force interactive shell
---no-interactive Disable interactive shell
--h, --help       Print this help and exit
--v, --version    Print component versions
+--sshfs             Makes wotan:/mounts and wotan:/suse available to the container.
+                    In order to works you should be able to access wotan.suse.de via ssh
+                    from your host system by simply run 'ssh wotan', without interaction
+                    You can find an example stanza in the README.md of this project.
+                    ${script_name} support ssh-agent out-of-the-box if it's configured
+                    in the host system.
+--nfs               Alternative to --sshfs, it makes some of the NFS exports available
+                    to the container. --sshfs should be prefered.
+--destroy           Destroy ${container} container and related components
+         [-i]       Also delete the container image
+         [-f]       Not interactive, [Y]es by default
+--root              Enter the running container as root user. Container debug mode
+--debug             Script debug mode
+--update-container  Destroy the current container, download the new image and recrate it
+--no-color          Turn off colored output
+--alias             Print a list of useful aliases, you can add it to your .bashrc
+--tty               Force terminal
+--no-tty            Disable terminal
+--interactive       Force interactive shell
+--no-interactive    Disable interactive shell
+-h, --help          Print this help and exit
+-v, --version       Print component versions
 EOF
 }
 
@@ -180,7 +182,7 @@ setup_colors() {
         blue='\033[0;34m'
         purple='\033[0;35m'
         cyan='\033[0;36m'
-        yellow='\033[1;33m'
+        yellow='\033[0;33m'
     fi
 }
 
@@ -589,8 +591,9 @@ pull_image() {
 }
 
 update_image() {
+    update_available || die "Your container is up-to-date, nothing to do here."
     local _upstream=$(upstream_image_version)
-    msg "[.] A container update is available, do you want to update the container now? [Y/n]"
+    msg "[.] A container update is available, do you want to update it now? [Y/n]"
     read -ep "    Changelog: https://gitlab.suse.de/security/secbox-image/-/tags/v${_upstream} " -n 1 -r
     if [[ ! $REPLY =~ ^[Nn]$ ]]; then
         if pull_image; then
@@ -807,6 +810,7 @@ main() {
         case "${1:-}" in
             --debug) set -x ;;
             --destroy) secbox_destroy "${2:-}" "${3:-}"; exit ;;
+            --update-container) update_image; print_version; exit ;;
             --root) secbox_root; exit ;;
             --no-color) no_color=1 && setup_colors ;;
             --nfs) nfs_flag='true' ;;
@@ -826,7 +830,8 @@ main() {
     sync_name_resolvers
 
     if suse_internal_network; then
-        update_available && update_image
+        update_available &&
+            msg "${yellow}[*]${no_format} A container update is available, use 'secbox --update-container' to update it."
     fi
 
     if container_is_not_running; then
