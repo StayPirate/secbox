@@ -752,7 +752,7 @@ secbox_destroy(){
 
     # Do not delete the local file structure during an update, but
     # only when the user intentionally use the --destroy flag
-    [[ "${FUNCNAME[1]}" != "update_image" ]] && remove_base_structure
+    [[ "${FUNCNAME[1]}" != "update_image" ]] && remove_base_structure || true
 }
 
 secbox_root() {
