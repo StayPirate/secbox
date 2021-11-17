@@ -471,6 +471,11 @@ secbox_container_exists() {
     podman container exists $container
 }
 
+secbox_container_not_exists() {
+    secbox_container_exists && return 1 || return 0
+    # Toggled return value
+}
+
 create_container() {
     podman image ls | grep -E "$image_name" >/dev/null 2>&1 || {
         # If the image does not exist, pull it
@@ -532,7 +537,7 @@ create_container() {
 }
 
 start_container() {
-    secbox_container_exists || {
+    secbox_container_not_exists && {
         # If the container does not exist, create it
         print_logo
         msg "${orange}[*]${no_format} ${container} container not found"
@@ -585,8 +590,8 @@ pull_image() {
 
 update_image() {
     local _upstream=$(upstream_image_version)
-    read -ep "[.] An update is available, do you want to update the container now? [Y/n] " -n 1 -r
-    msg "Changelog: https://gitlab.suse.de/security/secbox-image/-/tags/v${_upstream}"
+    msg "[.] A container update is available, do you want to update the container now? [Y/n]"
+    read -ep "    Changelog: https://gitlab.suse.de/security/secbox-image/-/tags/v${_upstream} " -n 1 -r
     if [[ ! $REPLY =~ ^[Nn]$ ]]; then
         if pull_image; then
             if secbox_container_exists; then
