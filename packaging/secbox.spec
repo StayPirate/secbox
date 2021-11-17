@@ -7,7 +7,7 @@
 %define archive_prefix secbox
 
 Name:           secbox
-Version:        1.10
+Version:        1.12
 Release:        0
 Summary:        Toolbox for your daily work at the SUSE Security Team
 License:        MIT
