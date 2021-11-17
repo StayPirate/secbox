@@ -669,7 +669,7 @@ sync_host_env() {
         echo -n "$env_var=" >> "$host_env"
         eval "echo \$$env_var" >> "$host_env"
     done
-    local container_id="$(podman container inspect ${container} | jq -r '.[] | .Id')"
+    local container_id="$(podman container inspect --format '{{.Id}}' ${container})"
     echo "secbox_container_id=${container_id}" >> "$host_env"
     set -u
 }
