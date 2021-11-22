@@ -3,7 +3,7 @@
 # shellcheck disable=SC2034
 set -u
 trap cleanup SIGINT SIGTERM ERR EXIT
-declare -r script_version="1.12"
+declare -r script_version="1.13"
 # -----------------------------------------------------------------------------
 #                     One tool to rule them all, one tool to containerize them
 #                   One tool to bring them all, and in the namespace bind them
@@ -46,10 +46,10 @@ declare -r script_version="1.12"
 
 print_help() {
     cat <<EOF
-Usage: ${script_name} [--debug] [-h] [-v] [--sshfs] [--destroy] [--root] \\
+Usage: ${script_name} [--debug] [-h] [-v] [--sshfs] [--destroy <-f> <-i>] [--root] \\
                 [--interactive|--no-interactive] [--tty|--no-tty] \\
                 [--no-color] [--nfs] [--alias] command [arg1 arg2...] \\
-                [--update-container]
+                [--update-container <-f|--force>]
 
 A collection of needed tools for your daily work in the Security Team.
 For more information: https://github.com/StayPirate/secbox
@@ -65,11 +65,13 @@ Available options:
 --nfs               Alternative to --sshfs, it makes some of the NFS exports available
                     to the container. --sshfs should be prefered.
 --destroy           Destroy ${container} container and related components
-         [-i]       Also delete the container image
-         [-f]       Not interactive, [Y]es by default
+    [-i]            Also delete the container image
+    [-f]            Not interactive, [Y]es by default
 --root              Enter the running container as root user. Container debug mode
 --debug             Script debug mode
 --update-container  Destroy the current container, download the new image and recrate it
+    [-f,--force]    Force the update with the latest remote image built regardless of its
+                    version
 --no-color          Turn off colored output
 --alias             Print a list of useful aliases, you can add it to your .bashrc
 --tty               Force terminal
@@ -591,14 +593,23 @@ pull_image() {
 }
 
 update_image() {
-    update_available || die "Your container is up-to-date, nothing to do here."
-    local _upstream=$(upstream_image_version)
-    msg "[.] A container update is available, do you want to update it now? [Y/n]"
-    read -ep "    Changelog: https://gitlab.suse.de/security/secbox-image/-/tags/v${_upstream} " -n 1 -r
+    local force='false'
+    if [[ "${1:-}" != "" ]]; then
+        [[ "${1:-}" != "-f" && "${1:-}" != "--force" ]] && die "${1:-} not a valid flag"
+        force='true'
+        msg "[.] You are going to replace the current ${container} container with a new one which will use"
+        read -ep "    the latest built of the container-image. Do you want to proceed? [Y/n]" -n 1 -r
+    else
+        update_available || die "Your container is up-to-date, nothing to do here."
+        local _upstream=$(upstream_image_version)
+        msg "[.] A container update is available, do you want to update it now? [Y/n]"
+        read -ep "    Changelog: https://gitlab.suse.de/security/secbox-image/-/tags/v${_upstream} " -n 1 -r
+    fi
     if [[ ! $REPLY =~ ^[Nn]$ ]]; then
         if pull_image; then
             if secbox_container_exists; then
-                if secbox_destroy -f -i; then
+                local destroy_opts='-f -i'; if [[ $force == 'true' ]]; then destroy_opts='-f'; fi
+                if secbox_destroy ${destroy_opts:-}; then
                     if create_container; then
                         start_container
                         return 0
@@ -810,7 +821,7 @@ main() {
         case "${1:-}" in
             --debug) set -x ;;
             --destroy) secbox_destroy "${2:-}" "${3:-}"; exit ;;
-            --update-container) update_image; print_version; exit ;;
+            --update-container) update_image "${2:-}"; echo && print_version; exit ;;
             --root) secbox_root; exit ;;
             --no-color) no_color=1 && setup_colors ;;
             --nfs) nfs_flag='true' ;;
