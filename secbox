@@ -598,7 +598,7 @@ update_image() {
         [[ "${1:-}" != "-f" && "${1:-}" != "--force" ]] && die "${1:-} not a valid flag"
         force='true'
         msg "[.] You are going to replace the current ${container} container with a new one which will use"
-        read -ep "    the latest built of the container-image. Do you want to proceed? [Y/n]" -n 1 -r
+        read -ep "    the latest build of the container-image. Do you want to proceed? [Y/n] " -n 1 -r
     else
         update_available || die "Your container is up-to-date, nothing to do here."
         local _upstream=$(upstream_image_version)
