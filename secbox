@@ -634,16 +634,20 @@ update_image() {
 update_available() {
     local _local_version=''
     local _version_in_use=''
+    local _higher_version=''
     _version_in_use=$(local_image_container_version)
     local _local_most_recent_image=$(local_most_recent_image_version)
     local _upstream_version=$(upstream_image_version)
 
     [[ -z $_version_in_use ]] && _local_version=${_local_most_recent_image:-} || _local_version=${_version_in_use:-}
 
-    if [[ "${_upstream_version:-}" =~ ^[0-9.]+$ && "${_local_version:-}" =~ ^[0-9.]+$ ]]; then
-        [[ $_upstream_version > $_local_version ]] && return
-    fi
-    return 1
+    # Check if versions are numbers (integer or floating point)
+    [[ "${_upstream_version:-}" =~ ^[0-9.]+$ && "${_local_version:-}" =~ ^[0-9.]+$ ]] || return 1
+
+    _upstream_version=2.10
+    _higher_version=$(echo -e "${_upstream_version}\n${_local_version}" | sort -Vr | head -n 1)
+    [ "${_higher_version}" == "${_local_version}" ] && return 1
+    return 0
 }
 
 systemd_service_is_enabled() {
