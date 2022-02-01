@@ -230,6 +230,7 @@ if [ -z \$secbox_container_id ] && [ ! -f /run/.containerenv ]; then
     alias prepare-submission='${script_name} prepare-submission.rb'
     alias prepare-kgraft='${script_name} --sshfs prepare-kgraft.rb'
     alias kernel-livepatch-signing-email-for-autobuild='${script_name} kernel-livepatch-signing-email-for-autobuild.py'
+    alias kern-cve='${script_name} kern-cve.sh'
 
     ### Internal Tools
     alias foodchain='${script_name} --sshfs --no-tty --no-interactive foodchain'
@@ -242,14 +243,14 @@ if [ -z \$secbox_container_id ] && [ ! -f /run/.containerenv ]; then
     # The token can be found in ~/.cache/python-bugzilla/bugzillatoken
     alias bz-login='bugzilla --bugzilla https://bugzilla.suse.com login'
 
-    alias php='secbox php'
-    alias phar='secbox phar'
-    alias sieveshell='secbox --no-tty sieveshell'
-    alias secret-tool='secbox --no-tty secret-tool'
+    alias php='${script_name} php'
+    alias phar='${script_name} phar'
+    alias sieveshell='${script_name} --no-tty sieveshell'
+    alias secret-tool='${script_name} --no-tty secret-tool'
 else
     ########## INSIDE THE CONTAINER ##########
-    export PS1=\"\u@secbox \W> \"
-    alias secbox='echo You cannot execute ${script_name} inside the $container container; false'
+    export PS1=\"\u@${script_name} \W> \"
+    alias ${script_name}='echo You cannot execute ${script_name} inside the $container container; false'
 fi
 "
 }
