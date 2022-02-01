@@ -577,7 +577,10 @@ local_most_recent_image_version() {
 
 upstream_image_version() {
     local _version=''
-    _version=$(curl -LsSf ${registry_api}${image_name}/tags/list 2>/dev/null | grep -Eo "[0-9.]+")
+    _version=$(curl -LsSf ${registry_api}${image_name}/tags/list 2>/dev/null | \
+               awk -F '"tags"' {'print $2'} | \
+               cut -d "]" -f 1 | \
+               grep -Eo "[0-9.]+")
     echo "$_version"
 }
 
