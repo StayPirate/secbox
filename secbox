@@ -572,7 +572,7 @@ local_image_container_version() {
 
 local_most_recent_image_version() {
     local _version=''
-    _version=$(podman image ls 2>/dev/null | grep secbox | awk '{print $2}' | sort -rn | head -1)
+    _version=$(podman image ls 2>/dev/null | grep secbox | awk '{print $2}' | sort -Vr | head -1)
     echo "$_version"
 }
 
@@ -597,33 +597,27 @@ pull_image() {
 }
 
 update_image() {
-    local force='false'
     if [[ "${1:-}" != "" ]]; then
         [[ "${1:-}" != "-f" && "${1:-}" != "--force" ]] && die "${1:-} not a valid flag"
-        force='true'
         msg "[.] You are going to replace the current ${container} container with a new one which will use"
         read -ep "    the latest build of the container-image. Do you want to proceed? [Y/n] " -n 1 -r
     else
-        update_available || die "Your container is up-to-date, nothing to do here."
+        update_available
+        local _update_available=$?
+        case "${_update_available}" in
+            2) msg "${orange}[*]${no_format} No local image found, the most recent one is going to be downloaded.\n    Please wait, it can take a while."
+               pull_image
+               ;;
+            1) die "Your container is up-to-date, nothing to do here." ;;
+        esac
         local _upstream=$(upstream_image_version)
         msg "[.] A container update is available, do you want to update it now? [Y/n]"
         read -ep "    Changelog: https://gitlab.suse.de/security/secbox-image/-/tags/v${_upstream} " -n 1 -r
     fi
     if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-        if pull_image; then
-            if secbox_container_exists; then
-                local destroy_opts='-f -i'; if [[ $force == 'true' ]]; then destroy_opts='-f'; fi
-                if secbox_destroy ${destroy_opts:-}; then
-                    if create_container; then
-                        start_container
-                        return 0
-                    fi
-                fi
-            else
-                # Old image locally available, no container running, and new image successfully downloaed 
-                return 0
-            fi
-        fi
+        secbox_container_exists && secbox_destroy -f -i
+        create_container
+        start_container
     else
         # Update denied by the user
         return 0
@@ -642,10 +636,11 @@ update_available() {
 
     [[ -z $_version_in_use ]] && _local_version=${_local_most_recent_image:-} || _local_version=${_version_in_use:-}
 
+    # If there's no any local image, then return 2
+    [[ ${_local_version:-} == "" ]] && return 2
     # Check if versions are numbers (integer or floating point)
     [[ "${_upstream_version:-}" =~ ^[0-9.]+$ && "${_local_version:-}" =~ ^[0-9.]+$ ]] || return 1
 
-    _upstream_version=2.10
     _higher_version=$(echo -e "${_upstream_version}\n${_local_version}" | sort -Vr | head -n 1)
     [ "${_higher_version}" == "${_local_version}" ] && return 1
     return 0
