@@ -237,7 +237,7 @@ if [ -z \$secbox_container_id ] && [ ! -f /run/.containerenv ]; then
     alias tel='${script_name} --sshfs --no-tty --no-interactive tel'
     alias create_archives_db='${script_name} --sshfs create_archives_db'
     alias query_archives_db='${script_name} query_archives_db'
-    alias mtk='${script_name} --sshfs mtk'
+    alias mtk='${script_name} mtk'
 
     # bz-login prompts an interactive login and set a local token for subsequent queries
     # The token can be found in ~/.cache/python-bugzilla/bugzillatoken
