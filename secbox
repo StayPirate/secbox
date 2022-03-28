@@ -213,10 +213,15 @@ aliases() {
     echo "\
 if [ -z \$secbox_container_id ] && [ ! -f /run/.containerenv ]; then
     ########## NOT INSIDE THE CONTAINER ##########
-    ### OBS/IBS/PBS
-    alias osc='${script_name} osc'
-    alias psc='${script_name} osc -A pbs'
+    ### OBS/IBS/PBS/BBS
+    # OBS: https://build.opensuse.org/
+    alias osc='${script_name} osc -A https://api.opensuse.org'
+    # IBS: https://build.suse.de/
     alias isc='${script_name} osc -A https://api.suse.de'
+    # PBS: https://build.prv.suse.net/
+    alias psc='${script_name} osc -A https://api.prv.suse.net'
+    # BBS: https://build.suse.asia/
+    alias bsc='${script_name} osc -A https://api.suse.asia'
     alias is_maintained='${script_name} is_maintained'
     alias quilt='${script_name} quilt'
     alias oscsd='osc service localrun download_files'
