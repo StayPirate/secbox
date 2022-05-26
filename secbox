@@ -250,7 +250,7 @@ if [ -z \$secbox_container_id ] && [ ! -f /run/.containerenv ]; then
 
     alias php='${script_name} php'
     alias phar='${script_name} phar'
-    alias sieveshell='${script_name} --no-tty sieveshell'
+    alias sieveshell='${script_name} --no-tty --interactive sieveshell'
     alias secret-tool='${script_name} --no-tty secret-tool'
 else
     ########## INSIDE THE CONTAINER ##########
