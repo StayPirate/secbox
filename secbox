@@ -404,15 +404,15 @@ sshfs_mount() {
     }
 
     podman container exec -d $container mkdir -p /mounts > /dev/null 2>&1
-    podman >/dev/null 2>&1 container exec --env-file="$host_env" -d $container sshfs -o nonempty,ro,StrictHostKeyChecking=no,compression=yes wotan:/mounts /mounts
+    podman >/dev/null 2>&1 container exec --env-file="$host_env" -d $container sshfs -o ro,StrictHostKeyChecking=no,compression=yes wotan:/mounts /mounts
     podman container exec -d $container mkdir -p /suse > /dev/null 2>&1
-    podman >/dev/null 2>&1 container exec --env-file="$host_env" -d $container sshfs -o nonempty,ro,StrictHostKeyChecking=no,compression=yes wotan:/suse   /suse
+    podman >/dev/null 2>&1 container exec --env-file="$host_env" -d $container sshfs -o ro,StrictHostKeyChecking=no,compression=yes wotan:/suse   /suse
 }
 
 sshfs_umount() {
-    podman container exec -d $container fusermount -uz /mounts > /dev/null 2>&1 ||
+    podman container exec -d $container fusermount3 -uz /mounts > /dev/null 2>&1 ||
         msg "${orange}[*]${no_format} ${container} cannot umount sshfs mountpoint: /mounts"
-    podman container exec -d $container fusermount -uz /suse > /dev/null 2>&1 ||
+    podman container exec -d $container fusermount3 -uz /suse > /dev/null 2>&1 ||
         msg "${orange}[*]${no_format} ${container} cannot umount sshfs mountpoint: /suse"
 }
 
