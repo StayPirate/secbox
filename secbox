@@ -227,6 +227,7 @@ if [ -z \$secbox_container_id ] && [ ! -f /run/.containerenv ]; then
     alias oscsd='osc service localrun download_files'
     alias oscb='osc build --ccache --cpio-bulk-download --download-api-only'
     alias bugzilla='${script_name} bugzilla'
+    alias insect='${script_name} insect'
     # Which package depends on SUSE:SLE-12:GA/Botan?
     # isc whatdependson SUSE:SLE-12:GA Botan standard x86_64
     alias dep_on='isc whatdependson'
