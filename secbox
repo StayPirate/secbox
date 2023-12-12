@@ -289,10 +289,10 @@ suse_internal_network() {
     # Check if VPN connection is available, fail if any of the following end-point is not reachable
     local -ar _know_internal_addresses=(
         # Check reachability of wotan's ssh service, since it likely has best uptime
-        "10.160.0.1/22"
+        "10.144.39.65/22"
         # dns lookup can introduce a very long delay when the dns server is not
         # reachable, so I test domain name resolution only if the above worked
-        "wotan.suse.de/22"
+        "login.suse.de/22"
     )
 
     for _address in "${_know_internal_addresses[@]}"; do
