@@ -46,44 +46,28 @@ TODO: description
 
  * ### **Ensure network resources access**
 
-    *This is not mandatory*, but if you wonna get the best experience it's important you know some tools are expecting network file system mounted in specific paths. To make them properly work secbox manages to make these network resources availabe in the right place. You only have to ensure that your host system can accesses them and authenticate if needed. Secbox supports two different protocols for that:
+    *This is not mandatory*, but if you wonna get the best experience it's important to be aware that some tools are expecting network shares to be mounted in specific paths. To make them properly work secbox manages to make these network resources availabe in the right place. You need to make sure that your host system is allowed to accesses them and authenticate.
 
-   1. NFS  
-      Can be triggered through the option `--nfs`, since `mount` requires high privileges, then you'll be prompted to input your user's password. A list of mounted exports is maintained with the [`nfs_shares` array](https://github.com/StayPirate/secbox/blob/master/secbox#L97-L107). I suggest using this option just in case the one described below cannot.
+   SSHFS *(prefered)*  
+    A **better approach** is the `--sshfs` option. Secbox uses sshfs (no need to install sshfs in your host) to mount `dist.suse.de:/mounts` and `dist.suse.de:/suse` in the expected paths inside the container. In order to make this option working you need to configure your host to be able to access `dist.suse.de` just by running
 
-   2. SSHFS *(prefered)*  
-      A **better approach** is the `--sshfs` option. Secbox uses sshfs (no need to install sshfs in your host) to mount `dist.suse.de:/mounts` and `dist.suse.de:/suse` in the expected paths inside the container. In order to make this option working you need to configure your host to be able to access `dist.suse.de` just by running
+        host> ssh dist
+
+    That can easily be accomplished throught a properly configured `~/.ssh/config`. You could use the following stanza template:
+
+        Host dist
+            HostName dist.suse.de
+            User <YOUR_USERNAME>
+            PreferredAuthentications publickey
+            IdentityFile /path/to/your/key
+
+    In case your ssh keys are manged by the ssh-agent, then you can avoid the last line *(IdentityFile)*, because secbox will automatically talk to the ssh-agent.
+
+    To check if your ssh setup is fine, try to access dist via `ssh dist`:
 
           host> ssh dist
-
-      That can easily be accomplished throught a properly configured `~/.ssh/config`. You could use the following stanza template:
-
-          Host dist
-              HostName dist.suse.de
-              User <YOUR_USERNAME>
-              PreferredAuthentications publickey
-              IdentityFile /path/to/your/key
-
-      In case your ssh keys are manged by the ssh-agent, then you can avoid the last line *(IdentityFile)*, because secbox will automatically talk to the ssh-agent.
-
-      To check if your ssh setup is fine, try to access dist via `ssh dist`:
-
-            host> ssh dist
-            Last login: Fri Jul 30 06:32:42 2021 from 2620:113:80c0:8340::11f1
-            This machine is used as:
-            * ...
-            * ...
-            * ...
-            * ...
-
-            Feel free to have a look into our configuration files in /etc
-
-            Questions/Remarks? Please sent a mail to xxx@email.com.
-            Issues, please open a ticket by sending an email to xxx@email.com.
-
-            Have a lot of fun...
-
-            <YOUR_USERNAME>@dist:~>
+          Last login: Fri Jul 30 06:32:42 2021 from 2620:113:80c0:8340::11f1
+          <YOUR_USERNAME>@Dist:~>
 
 ## Try it
 
