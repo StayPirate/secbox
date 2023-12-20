@@ -52,23 +52,23 @@ TODO: description
       Can be triggered through the option `--nfs`, since `mount` requires high privileges, then you'll be prompted to input your user's password. A list of mounted exports is maintained with the [`nfs_shares` array](https://github.com/StayPirate/secbox/blob/master/secbox#L97-L107). I suggest using this option just in case the one described below cannot.
 
    2. SSHFS *(prefered)*  
-      A **better approach** is the `--sshfs` option. Secbox uses sshfs (no need to install sshfs in your host) to mount `wotan.suse.de:/mounts` and `wotan.suse.de:/suse` in the expected paths inside the container. In order to make this option working you need to configure your host to be able to access `wotan.suse.de` just by running
+      A **better approach** is the `--sshfs` option. Secbox uses sshfs (no need to install sshfs in your host) to mount `dist.suse.de:/mounts` and `dist.suse.de:/suse` in the expected paths inside the container. In order to make this option working you need to configure your host to be able to access `dist.suse.de` just by running
 
-          host> ssh wotan
+          host> ssh dist
 
       That can easily be accomplished throught a properly configured `~/.ssh/config`. You could use the following stanza template:
 
-          Host wotan
-              HostName wotan.suse.de
+          Host dist
+              HostName dist.suse.de
               User <YOUR_USERNAME>
               PreferredAuthentications publickey
               IdentityFile /path/to/your/key
 
       In case your ssh keys are manged by the ssh-agent, then you can avoid the last line *(IdentityFile)*, because secbox will automatically talk to the ssh-agent.
 
-      To check if your ssh setup is fine, try to access wotan via `ssh wotan`:
+      To check if your ssh setup is fine, try to access dist via `ssh dist`:
 
-            host> ssh wotan
+            host> ssh dist
             Last login: Fri Jul 30 06:32:42 2021 from 2620:113:80c0:8340::11f1
             This machine is used as:
             * ...
@@ -83,7 +83,7 @@ TODO: description
 
             Have a lot of fun...
 
-            <YOUR_USERNAME>@wotan:~>
+            <YOUR_USERNAME>@dist:~>
 
 ## Try it
 

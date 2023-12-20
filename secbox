@@ -56,11 +56,11 @@ For more information: https://github.com/StayPirate/secbox
 
 Available options:
 
---sshfs             Makes wotan:/mounts and wotan:/suse available to the container.
-                    In order to works you should be able to access wotan.suse.de via ssh
-                    from your host system by simply run 'ssh wotan', without interaction
+--sshfs             Makes dist:/mounts and dist:/suse available to the container.
+                    In order to works you should be able to access dist.suse.de via ssh
+                    from your host system by simply run 'ssh dist', without interaction
                     You can find an example stanza in the README.md of this project.
-                    ${script_name} support ssh-agent out-of-the-box if it's configured
+                    ${script_name} supports ssh-agent out-of-the-box if it's configured
                     in the host system.
 --nfs               Alternative to --sshfs, it makes some of the NFS exports available
                     to the container. --sshfs should be prefered.
@@ -157,7 +157,7 @@ cleanup() {
             # Check if a parallel secbox instance is using sshfs, if yes do not umount
             if [[ $(secbox_instances_using_sshfs) -le 3 ]]; then
                 sshfs_umount &&
-                    msg_to_secbox_sessions "==== Another ${script_name} instance has umounted wotan:/mounts in /mounts ===="
+                    msg_to_secbox_sessions "==== Another ${script_name} instance has umounted dist:/mounts in /mounts ===="
             fi
         fi
     fi
@@ -288,7 +288,7 @@ enable_container_service() {
 suse_internal_network() {
     # Check if VPN connection is available, fail if any of the following end-point is not reachable
     local -ar _know_internal_addresses=(
-        # Check reachability of wotan's ssh service, since it likely has best uptime
+        # Check reachability of login's ssh service, since it likely has best uptime
         "10.144.39.65/22"
         # dns lookup can introduce a very long delay when the dns server is not
         # reachable, so I test domain name resolution only if the above worked
@@ -405,9 +405,9 @@ sshfs_mount() {
     }
 
     podman container exec -d $container mkdir -p /mounts > /dev/null 2>&1
-    podman >/dev/null 2>&1 container exec --env-file="$host_env" -d $container sshfs -o ro,StrictHostKeyChecking=no,compression=yes wotan:/mounts /mounts
+    podman >/dev/null 2>&1 container exec --env-file="$host_env" -d $container sshfs -o ro,StrictHostKeyChecking=no,compression=yes dist:/mounts /mounts
     podman container exec -d $container mkdir -p /suse > /dev/null 2>&1
-    podman >/dev/null 2>&1 container exec --env-file="$host_env" -d $container sshfs -o ro,StrictHostKeyChecking=no,compression=yes wotan:/suse   /suse
+    podman >/dev/null 2>&1 container exec --env-file="$host_env" -d $container sshfs -o ro,StrictHostKeyChecking=no,compression=yes dist:/suse   /suse
 }
 
 sshfs_umount() {
@@ -462,18 +462,18 @@ mount_remote_volumes() {
     fi
 
     if [[ -n $sshfs_flag ]] && ! sshfs_is_mounted; then
-        if ! ssh -qo "BatchMode=yes" wotan exit; then
-            msg "${orange}[*]${no_format} ${container} cannot access wotan via 'ssh wotan'.
-    Please ensure you have properly configured wotan in your ~/.ssh/config. A valid stanza should be like:
-    Host wotan
-        HostName wotan.suse.de
+        if ! ssh -qo "BatchMode=yes" dist exit; then
+            msg "${orange}[*]${no_format} ${container} cannot access dist via 'ssh dist'.
+    Please ensure you have properly configured dist in your ~/.ssh/config. A valid stanza should be like:
+    Host dist
+        HostName dist.suse.de
         User <YOUR_USERNAME>
         PreferredAuthentications publickey
         IdentityFile /path/to/your/key
     you could avoid IdentityFile in case your key is loaded in the ssh-agent, in this case ${script_name} will use it"
         else
             sshfs_mount &&
-                msg_to_secbox_sessions "==== Another ${script_name} instance has mounted wotan:/mounts in /mounts ===="
+                msg_to_secbox_sessions "==== Another ${script_name} instance has mounted dist:/mounts in /mounts ===="
         fi
     fi
 }
