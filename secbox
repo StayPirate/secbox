@@ -297,7 +297,7 @@ suse_internal_network() {
 
     for _address in "${_know_internal_addresses[@]}"; do
         # Fail at first connection that can't be estabilished
-        timeout 1 sh -c "echo > /dev/tcp/${_address}" >/dev/null 2>&1 || return
+        timeout 1 sh -c "echo > /dev/tcp/${_address}" >/dev/null 2>&1 && return
     done
 }
 
