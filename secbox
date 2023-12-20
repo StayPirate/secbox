@@ -24,10 +24,10 @@ declare -r script_version="1.17"
 #   daily work in the SUSE Security Team.
 #
 #   It does not only manage the toolset but it also takes care of mounting the
-#   required NFS exports. Think at this as a portable workstation setup. It
-#   makes hard use of Podman as container engine, so make sure it's installed
-#   on your machine and configured to run rootless. Your home directory will be
-#   mounted as home directory within the container, this makes all your
+#   required NFS exports via sshfs. Think at this as a portable workstation
+#   setup. It makes hard use of Podman as container engine, so make sure it's
+#   installed on your machine and configured to run rootless. Your home directory
+#   will be mounted as home directory within the container, this makes all your
 #   dotfiles accessible from the preinstalled tools. The first time you run
 #   this script the container will be created. The best way to use this script
 #   from your terminal is by leveraging aliases. Use 'secbox --alias' to get a
@@ -48,7 +48,7 @@ print_help() {
     cat <<EOF
 Usage: ${script_name} [--debug] [-h] [-v] [--sshfs] [--destroy <-f> <-i>] [--root] \\
                 [--interactive|--no-interactive] [--tty|--no-tty] \\
-                [--no-color] [--nfs] [--alias] command [arg1 arg2...] \\
+                [--no-color] [--alias] command [arg1 arg2...] \\
                 [--update-container <-f|--force>]
 
 A collection of needed tools for your daily work in the Security Team.
@@ -62,8 +62,6 @@ Available options:
                     You can find an example stanza in the README.md of this project.
                     ${script_name} supports ssh-agent out-of-the-box if it's configured
                     in the host system.
---nfs               Alternative to --sshfs, it makes some of the NFS exports available
-                    to the container. --sshfs should be prefered.
 --destroy           Destroy ${container} container and related components
     [-i]            Also delete the container image
     [-f]            Not interactive, [Y]es by default
@@ -103,18 +101,6 @@ declare -r registry_api="https://${registry}/v2/"
 declare -r image_name="non_public/maintenance/security/container/containers/secbox"
 declare -r local_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/${container}"
 declare -r container_unit="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/${container}.service"
-declare -r nfs_volumes_dir="${local_data_dir}/volumes"
-declare -ar nfs_shares=(
-### address:/share,mountpoint,nfs_version
-    # dist and mirror are required by `osc omg rr` to perform tests.
-    "dist.suse.de:/dist,/mounts/dist,4.2"
-    "loki.suse.de:/vol/euklid,/mounts/mirror,3"
-    #"hilbert.suse.de:/work,/mounts/work,4.2"
-    #"rufus.suse.de:/vol/schnell,/mounts/schnell,3"
-    #"rufus.suse.de:/vol/work_users,/mounts/work_users,3"
-    #"hilbert.suse.de:/built,/mounts/built,4.2"
-    #"dust.suse.de:/unpacked,/mounts/unpacked,4.2"
-)
 declare -ar host_env_vars=(
 ### List of environment variables to copy from the host at each run
     "SSH_AUTH_SOCK"
@@ -125,31 +111,18 @@ declare -ar host_env_vars=(
 create_base_structure() {
     [[ -d "${local_config_dir}" ]] || mkdir -p "${local_config_dir}"
     [[ -d "${local_data_dir}" ]] || mkdir -p "${local_data_dir}"
-    [[ -d "${nfs_volumes_dir}" ]] || mkdir -p "${nfs_volumes_dir}"
     [[ -f "${resolv_conf}" ]] || echo -n > "$resolv_conf"
     [[ -f "${host_env}" ]] || echo -n > "$host_env"
 }
 
 remove_base_structure() {
     [[ -d "${local_data_dir}" ]] && rm -rf "${local_data_dir}"
-    [[ -d "${nfs_volumes_dir}" ]] && rm -rf "${nfs_volumes_dir}"
     [[ -f "${resolv_conf}" ]] && rm "$resolv_conf"
     [[ -f "${host_env}" ]] && rm "$host_env"
 }
 
 cleanup() {
     trap - SIGINT SIGTERM ERR EXIT
-
-    # Umount NFS shares if were enabled
-    if [[ -n ${nfs_flag:-} ]]; then
-        if nfs_is_mounted; then
-            # Check if a parallel secbox instance is using nfs, if yes do not umount exports
-            if [[ $(secbox_instances_using_nfs) -le 3 ]]; then
-                nfs_umount_all &&
-                    msg_to_secbox_sessions "==== Another ${script_name} instance has umounted the nfs exports in /mounts ===="
-            fi
-        fi
-    fi
 
     # Umount SSHFS if was enabled
     if [[ -n ${sshfs_flag:-} ]]; then
@@ -301,12 +274,6 @@ suse_internal_network() {
     done
 }
 
-secbox_instances_using_nfs() {
-    local _instances=0
-    _instances=$(pgrep --count --full "${container}.* --nfs")
-    echo "$_instances"
-}
-
 secbox_instances_using_sshfs() {
     local _instances=0
     _instances=$(pgrep --count --full "${container}.* --sshfs")
@@ -321,72 +288,6 @@ other_secbox_instances() {
 
 sudo_privs() {
     sudo -nv >/dev/null 2>&1
-}
-
-nfs_is_mounted() {
-    local _share
-    for _share in "${nfs_shares[@]}"; do                                    # nfs.example.tld:/a/b,/mount/point,4.2
-
-        local _nfs_address=$(echo "$_share" | cut -d "," -f 1)              # nfs.example.tld:/a/b
-        local _nfs_name=$(echo "${_nfs_address#*/}" | sed 's/\//_/')        # nfs.example.tld:/a/b -> a_b
-
-        if nfs_volume_exists "${_nfs_name}" "${_nfs_address}"; then
-            # If at least one volume is mounted, return true
-            return 0
-        fi
-    done
-    return 1
-}
-
-nfs_volume_exists() {
-    # $1 name - (e.g.: vol_euklid)
-    # $2 address - (e.g.: loki.suse.de:/vol/euklid)
-    mount | grep -E "${2} on ${nfs_volumes_dir}/${1}" > /dev/null 2>&1
-}
-
-nfs_umount_all() {
-    local _share
-    for _share in "${nfs_shares[@]}"; do                                    # nfs.example.tld:/a/b,/mount/point,4.2
-
-        local _nfs_address=$(echo "$_share" | cut -d "," -f 1)              # nfs.example.tld:/a/b
-        local _nfs_name=$(echo "${_nfs_address#*/}" | sed 's/\//_/')        # nfs.example.tld:/a/b -> a_b
-
-        if nfs_volume_exists "${_nfs_name}" "${_nfs_address}"; then
-            sudo_privs || msg "${cyan}[*]${no_format} Request sudo privs for ${USER} to umount NFS volumes:"
-            sudo umount -lf "${nfs_volumes_dir}/${_nfs_name}" 2>&1 ||
-                msg "${orange}[*]${no_format} NFS: cannot umount ${nfs_volumes_dir}/${_nfs_name}"
-        fi
-    done
-}
-
-nfs_mount_all() {
-    local _share
-    local _nfs_mount_succeed=1 #default not succeeded
-    for _share in "${nfs_shares[@]}"; do                                    # nfs.example.tld:/a/b,/mount/point,4.2
-
-        local _nfs_address=$(echo "$_share" | cut -d "," -f 1)              # nfs.example.tld:/a/b
-        local _nfs_mountpoint=$(echo "$_share" | cut -d "," -f 2)           # /mount/point
-        local _nfs_version=$(echo "$_share" | cut -d "," -f 3)              # 4.2
-        local _nfs_name=$(echo "${_nfs_address#*/}" | sed 's/\//_/')        # nfs.example.tld:/a/b -> a_b
-
-        if ! nfs_volume_exists "${_nfs_name}" "${_nfs_address}"; then
-            sudo_privs || msg "${cyan}[*]${no_format} Request sudo privs for ${USER} to mount NFS volumes:"
-            [[ -d "${nfs_volumes_dir}/${_nfs_name}" ]] || mkdir -p "${nfs_volumes_dir}/${_nfs_name}" > /dev/null 2>&1
-            [[ -z "$(ls -A "${nfs_volumes_dir}/${_nfs_name}")" ]] || {
-                # NFS share not mounted yet, and the mountpoint is not empty
-                msg "${orange}[*]${no_format} NFS: cannot mount ${nfs_volumes_dir}/${_nfs_name}, mountpoint not empty"
-            }
-            if sudo mount -t nfs \
-            -o vers="$_nfs_version",ro,noatime,proto=tcp,sec=sys,local_lock=none,rsize=1048576,wsize=1048576 \
-            "$_nfs_address" \
-            "${nfs_volumes_dir}/${_nfs_name}" > /dev/null 2>&1; then
-                _nfs_mount_succeed=0 # At least one nfs export has been mounted
-            else
-                msg "${orange}[*]${no_format} NFS: cannot mount ${nfs_volumes_dir}/${_nfs_name}"
-            fi
-        fi
-    done
-    return $_nfs_mount_succeed
 }
 
 sshfs_exists() {
@@ -444,23 +345,6 @@ fuse_access() {
 }
 
 mount_remote_volumes() {
-    [[ -n $nfs_flag && -n $sshfs_flag ]] && {
-        die "[!] Options --sshfs and --nfs are mutual exclusivity, pick one of the two"
-    }
-
-    if [[ -n $nfs_flag ]] && [[ $(secbox_instances_using_sshfs) -ge 1 ]]; then
-        die "[!] Cannot use --nfs because another ${script_name} instance is using --sshfs"
-    fi
-
-    if [[ -n $sshfs_flag ]] && [[ $(secbox_instances_using_nfs) -ge 1 ]]; then
-        die "[!] Cannot use --sshfs because another ${script_name} instance is using --nfs"
-    fi
-
-    if [[ -n $nfs_flag ]]; then
-        nfs_mount_all &&
-            msg_to_secbox_sessions "==== Another ${script_name} instance has mounted the nfs exports in /mounts ===="
-    fi
-
     if [[ -n $sshfs_flag ]] && ! sshfs_is_mounted; then
         if ! ssh -qo "BatchMode=yes" dist exit; then
             msg "${orange}[*]${no_format} ${container} cannot access dist via 'ssh dist'.
@@ -527,18 +411,6 @@ create_container() {
     else
         msg "${orange}[*]${no_format} fuse not available, --sshfs option will not work"
     fi
-
-    # Create NFS mountpoints
-    for _share in "${nfs_shares[@]}"; do                                # nfs.example.tld:/a/b,/mount/point,4.2
-        local _nfs_address=$(echo "$_share" | cut -d "," -f 1)          # nfs.example.tld:/a/b
-        local _nfs_mountpoint=$(echo "$_share" | cut -d "," -f 2)       # /mount/point
-        local _nfs_version=$(echo "$_share" | cut -d "," -f 3)          # 4.2
-        local _nfs_name=$(echo "${_nfs_address#*/}" | sed 's/\//_/')    # nfs.example.tld:/a/b -> a_b
-
-        [[ -d "${nfs_volumes_dir}/${_nfs_name}" ]] || mkdir -p "${nfs_volumes_dir}/${_nfs_name}" > /dev/null 2>&1
-        _podman_cmdline="${_podman_cmdline} --mount \
-                    type=bind,source=${nfs_volumes_dir}/${_nfs_name},destination=${_nfs_mountpoint},bind-propagation=shared"
-    done
 
     _podman_cmdline="${_podman_cmdline} \
                      ${registry}/${image_name}:${_image_version}"
@@ -822,7 +694,6 @@ main() {
     fi
 
     sshfs_flag=''
-    nfs_flag=''
     tty='auto'
     interactive='auto'
 
@@ -833,7 +704,6 @@ main() {
             --update-container) update_image "${2:-}"; echo && print_version; exit ;;
             --root) secbox_root; exit ;;
             --no-color) no_color=1 && setup_colors ;;
-            --nfs) nfs_flag='true' ;;
             --sshfs) sshfs_flag='true' ;;
             --no-tty) tty='false' ;;
             --tty) tty='true' ;;
