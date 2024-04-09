@@ -107,6 +107,11 @@ declare -ar host_env_vars=(
     "DBUS_SESSION_BUS_ADDRESS"
     "LANG"
 )
+declare -ar extra_env_vars=(
+### List of initialized environment variables you want to find inside the container
+    "TERM=xterm-256color"
+    "COLORTERM=truecolor"
+)
 
 create_base_structure() {
     [[ -d "${local_config_dir}" ]] || mkdir -p "${local_config_dir}"
@@ -566,6 +571,9 @@ sync_host_env() {
     for env_var in "${host_env_vars[@]}"; do
         echo -n "$env_var=" >> "$host_env"
         eval "echo \$$env_var" >> "$host_env"
+    done
+    for env_var in "${extra_env_vars[@]}"; do
+        echo "$env_var" >> "$host_env"
     done
     local container_id="$(podman container inspect --format '{{.Id}}' ${container})"
     echo "secbox_container_id=${container_id}" >> "$host_env"
