@@ -111,6 +111,7 @@ declare -ar extra_env_vars=(
 ### List of initialized environment variables you want to find inside the container
     "TERM=xterm-256color"
     "COLORTERM=truecolor"
+    "PYTHONPATH=/opt/imtools"
 )
 
 create_base_structure() {
@@ -224,7 +225,7 @@ if [ -z \$secbox_container_id ] && [ ! -f /run/.containerenv ]; then
     alias query_archives_db='${script_name} query_archives_db'
     alias mtk='${script_name} mtk'
     alias gitkern='${script_name} gitkern'
-    alias im='secbox python3.11 /opt/imtools/im.py'
+    alias im='secbox python3.11 -m imtools.im'
 
     # bz-login prompts an interactive login and set a local token for subsequent queries
     # The token can be found in ~/.cache/python-bugzilla/bugzillatoken
