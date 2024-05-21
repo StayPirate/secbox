@@ -233,7 +233,6 @@ if [ -z \$secbox_container_id ] && [ ! -f /run/.containerenv ]; then
 
     alias php='${script_name} php'
     alias phar='${script_name} phar'
-    type sieveshell 2>/dev/null 1>&2 || alias sieveshell='${script_name} --no-tty --interactive sieveshell'
     type secret-tool 2>/dev/null 1>&2 || alias secret-tool='${script_name} --no-tty secret-tool'
     type ldapsearch 2>/dev/null 1>&2 || alias ldapsearch='${script_name} ldapsearch'
 else
