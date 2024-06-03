@@ -112,6 +112,7 @@ declare -ar extra_env_vars=(
     "TERM=xterm-256color"
     "COLORTERM=truecolor"
     "PYTHONPATH=/opt/imtools"
+    "PYTHONNOUSERSITE=true"
 )
 
 create_base_structure() {
