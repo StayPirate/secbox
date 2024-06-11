@@ -218,6 +218,7 @@ if [ -z \$secbox_container_id ] && [ ! -f /run/.containerenv ]; then
     alias submit-kgraft='${script_name} submit-kgraft.pl'
     alias kernel-livepatch-signing-email-for-autobuild='${script_name} kernel-livepatch-signing-email-for-autobuild.py'
     alias kern-cve='${script_name} kern-cve.sh'
+    alias cved='${script_name} cve-desc.sh'
 
     ### Internal Tools (reactive)
     alias mtk='${script_name} mtk'
