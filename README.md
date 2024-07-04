@@ -25,7 +25,7 @@ TODO: description
 
  * OpenSUSE Leap 15.2 / 15.3 / Tumbleweed
 
-        _opensuse_version=$(cat /etc/os-release | grep -Po "(?<=PRETTY_NAME=\").*(?=\")" | sed 's/ /_/g');
+        _opensuse_version=$(cat /etc/os-release | grep -Po "(?<=PRETTY_NAME=\").*(?=\")" | sed 's/openSUSE Leap //g' | sed 's/ /_/g');
         zypper addrepo https://download.opensuse.org/repositories/security/${_opensuse_version}/security.repo && \
         zypper --non-interactive --gpg-auto-import-keys refresh && \
         zypper --non-interactive install -y secbox && \
