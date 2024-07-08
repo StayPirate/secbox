@@ -214,7 +214,7 @@ if [ -z \$secbox_container_id ] && [ ! -f /run/.containerenv ]; then
 
     ### UM: Kernel updates
     alias prepare-submission='${script_name} prepare-submission.rb'
-    alias prepare-kgraft='${script_name} --sshfs prepare-kgraft.rb'
+    alias prepare-kgraft='${script_name} prepare-kgraft.rb'
     alias submit-kgraft='${script_name} submit-kgraft.pl'
     alias kernel-livepatch-signing-email-for-autobuild='${script_name} kernel-livepatch-signing-email-for-autobuild.py'
     alias kern-cve='${script_name} kern-cve.sh'
