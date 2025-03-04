@@ -44,6 +44,8 @@ TODO: description
 
     That's a great way to also get any new alias automatically loaded within terminal sessions created after you'll have updated secbox. *If you create more aliases don't be shy and submit them via a PR, I'll be glad to merge them.*
 
+    Secbox, in case it pulls the image from an internal registry, needs to trust the (internal) CA to successfully establish the HTTPS connection. In openSUSE Tumbleweed that is achieved by copying the CA's PEM certificate into `/etc/pki/trust/anchors/` and running `update-ca-certificates`.
+
  * ### **Ensure network resources access**
 
     *This is not mandatory*, but if you wonna get the best experience it's important to be aware that some tools are expecting network shares to be mounted in specific paths. To make them properly work secbox manages to make these network resources availabe in the right place. You need to make sure that your host system is allowed to accesses them and authenticate.
