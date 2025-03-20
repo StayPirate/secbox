@@ -27,6 +27,7 @@ TODO: description
 
         _opensuse_version=$(cat /etc/os-release | grep -Po "(?<=PRETTY_NAME=\").*(?=\")" | sed 's/openSUSE Leap //g' | sed 's/ /_/g');
         zypper addrepo https://download.opensuse.org/repositories/security/${_opensuse_version}/security.repo && \
+        zypper addrepo https://download.opensuse.org/repositories/SUSE:/CA/${_opensuse_version}/SUSE:CA.repo && \
         zypper --non-interactive --gpg-auto-import-keys refresh && \
         zypper --non-interactive install -y secbox && \
         unset _opensuse_version
@@ -45,8 +46,6 @@ TODO: description
     That's a great way to also get any new alias automatically loaded within terminal sessions created after you'll have updated secbox. *If you create more aliases don't be shy and submit them via a PR, I'll be glad to merge them.*
 
  * ### **Ensure network resources access**
-
-    Secbox pulls the container image from an internal registry. You may need to trust the SUSE internal CA to successfully establish required HTTPS connections. In openSUSE Tumbleweed this can be achieved by copying the SUSE internal CA's PEM certificate into `/etc/pki/trust/anchors/` and running `update-ca-certificates`.
 
     *This is not mandatory*, but if you wonna get the best experience it's important to be aware that some tools are expecting network shares to be mounted in specific paths. To make them properly work secbox manages to make these network resources availabe in the right place. You need to make sure that your host system is allowed to accesses them and authenticate.
 

@@ -17,6 +17,7 @@ Source:         %{archive_prefix}-%{version}.tar.xz
 BuildArch:      noarch
 Requires:       podman
 Requires:       curl
+Requires:       ca-certificates-suse
 Recommends:     openssh
 
 %description
