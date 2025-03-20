@@ -106,6 +106,7 @@ declare -ar host_env_vars=(
     "SSH_AUTH_SOCK"
     "DBUS_SESSION_BUS_ADDRESS"
     "LANG"
+    "XDG_RUNTIME_DIR"
 )
 declare -ar extra_env_vars=(
 ### List of initialized environment variables you want to find inside the container
