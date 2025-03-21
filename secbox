@@ -3,7 +3,7 @@
 # shellcheck disable=SC2034
 set -u
 trap cleanup SIGINT SIGTERM ERR EXIT
-declare -r script_version="1.23"
+declare -r script_version="1.24"
 # -----------------------------------------------------------------------------
 #                     One tool to rule them all, one tool to containerize them
 #                   One tool to bring them all, and in the namespace bind them
