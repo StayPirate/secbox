@@ -224,7 +224,7 @@ if [ -z \$secbox_container_id ] && [ ! -f /run/.containerenv ]; then
     ### Internal Tools (reactive)
     alias mtk='${script_name} mtk'
     alias gitkern='${script_name} gitkern'
-    alias im='secbox python3.11 -m imtools.im'
+    alias im='secbox python3 -m imtools.im'
 
     ### Internal Tools (proactive)
     alias audit_report='${script_name} audit_report.py'
