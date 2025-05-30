@@ -399,6 +399,9 @@ create_container() {
     }
 
     local _image_version=$(local_most_recent_image_version)
+    if [[ $_image_version == "" ]]; then
+        msg "${red}[!]${no_format} Could not determine image version"
+    fi
 
     # The volume ${tmp_dir}:${tmp_dir} (aka ${XDG_RUNTIME_DIR:-/tmp}) adds
     # some usefull capabilities to the container, the most used ones (for me) are:
@@ -482,6 +485,9 @@ upstream_image_version() {
                awk -F '"tags"' {'print $2'} | \
                cut -d "]" -f 1 | \
                grep -Eo "[0-9.]+")
+    if [[ $_version == "" ]]; then
+        msg "${red}[!]${no_format} Could not obtain upstream image version from the registry. Are you sure /etc/pki/trust/anchors contains the internal CA cert?"
+    fi
     echo "$_version"
 }
 
