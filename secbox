@@ -220,6 +220,8 @@ if [ -z \$secbox_container_id ] && [ ! -f /run/.containerenv ]; then
     alias kernel-livepatch-signing-email-for-autobuild='${script_name} kernel-livepatch-signing-email-for-autobuild.py'
     alias kern-cve='${script_name} kern-cve.sh'
     alias cved='${script_name} cve-desc.sh'
+    alias prepare-kernel='${script_name} prepare-kernel'
+    alias prepare-lp='${script_name} prepare-lp'
 
     ### Internal Tools (reactive)
     alias mtk='${script_name} mtk'
