@@ -402,6 +402,13 @@ create_container() {
     }
 
     local _image_version=$(local_most_recent_image_version)
+
+    # In case a local image version cannot be found, use the upstream version
+    # and podman will take care of pulling it if missing
+    if [[ $_image_version == "" ]]; then
+       _image_version=$(upstream_image_version)
+    fi
+
     if [[ $_image_version == "" ]]; then
         msg "${red}[!]${no_format} Could not determine image version"
     fi
