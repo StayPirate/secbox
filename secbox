@@ -444,7 +444,7 @@ create_container() {
 
     # In case Selinux is enforced we need to configure it to allow host's filesystem access
     if type sestatus >/dev/null 2>&1; then
-        sestatus | grep -q 'mode: *enforcing' && _podman_cmdline="${_podman_cmdline} --security-opt label=type:spc_t"
+        sestatus | grep -q 'mode: *enforcing' && _podman_cmdline="${_podman_cmdline} --security-opt label=disable"
     fi
 
     _podman_cmdline="${_podman_cmdline} \
