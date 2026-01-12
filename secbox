@@ -227,6 +227,7 @@ if [ -z \$secbox_container_id ] && [ ! -f /run/.containerenv ]; then
     alias mtk='${script_name} mtk'
     alias gitkern='${script_name} gitkern'
     alias im='${script_name} im'
+    alias git-obs='${script_name} git-obs'
 
     ### Internal Tools (proactive)
     alias audit_report='${script_name} audit_report.py'
