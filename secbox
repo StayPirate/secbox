@@ -101,6 +101,8 @@ declare -r registry_api="https://${registry}/v2/"
 declare -r image_name="non_public/maintenance/security/container/containers/secbox"
 declare -r local_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/${container}"
 declare -r container_unit="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/${container}.service"
+declare -r quadlet_dir="${XDG_CONFIG_HOME:-$HOME/.config}/containers/systemd"
+declare -r quadlet_unit="${quadlet_dir}/${container}.container"
 declare -ar host_env_vars=(
 ### List of environment variables to copy from the host at each run
     "SSH_AUTH_SOCK"
@@ -257,26 +259,7 @@ fi
 
 enable_container_service() {
 # Configure the container to start at boot
-
-    # Create systemd user's folder if don't exists
-    mkdir -p "${container_unit%/*}" > /dev/null 2>&1
-    # If systemd unit does not exist, create it
-    systemctl --user status ${container}.service >/dev/null 2>&1 || {
-        if podman generate systemd --name $container > "$container_unit"; then
-            #####
-            # FIXME: To be removed once the fix end to the upstream. Workaround for: 
-            # https://github.com/containers/podman/issues/8506#issuecomment-735442979
-            sed -e '/^PID/s/^/#/' -i "$container_unit"
-            #####
-        else
-            msg "${orange}[*]${no_format} Cannot create ${container}.service"
-        fi
-
-        systemctl --user daemon-reload
-    }
-
-    systemctl --user is-enabled --quiet ${container}.service ||
-        systemctl --user enable ${container}.service > /dev/null 2>&1
+    systemctl --user daemon-reload
 }
 
 suse_internal_network() {
@@ -421,37 +404,51 @@ create_container() {
     #  - Folders created via mkcd (alias) can be accessed from the container, hence I can use them with its tools
     #    * mkcd: https://github.com/StayPirate/dotfiles/blob/04b556b42df2d2a31ffee7247897c7b3229c7675/.zshrc#L117
 
-    local _podman_cmdline="podman container create \
-                            --name ${container} \
-                            --userns=keep-id \
-                            -u $(id -u) \
-                            --network host \
-                            --dns=none \
-                            -v \"$(readlink -e "${BASH_SOURCE[0]}"):/usr/bin/secbox\" \
-                            -v ${resolv_conf}:/etc/resolv.conf:ro \
-                            -v ${tmp_dir}:${tmp_dir} \
-                            -v ${HOME}:${HOME} \
-                            -w ${HOME}"
+    mkdir -p "${quadlet_dir}" >/dev/null 2>&1
 
-    [[ "$tmp_dir" != "/tmp" ]] && _podman_cmdline="${_podman_cmdline} -v /tmp:/tmp"
+    cat > "${quadlet_unit}" <<EOF
+[Unit]
+Description=Secbox container
+After=network-online.target
+
+[Container]
+ContainerName=${container}
+Image=${registry}/${image_name}:${_image_version}
+UserNS=keep-id
+User=$(id -u)
+Network=host
+DNS=none
+Volume=$(readlink -e "${BASH_SOURCE[0]}"):/usr/bin/secbox
+Volume=${resolv_conf}:/etc/resolv.conf:ro
+Volume=${tmp_dir}:${tmp_dir}
+Volume=${HOME}:${HOME}
+WorkingDir=${HOME}
+EOF
+
+    if [[ "$tmp_dir" != "/tmp" ]]; then
+        echo "Volume=/tmp:/tmp" >> "${quadlet_unit}"
+    fi
 
     # SYS_ADMIN capabilities are added to use FUSE from the container in order to mount sshfs, keep in mind
     # that this is a rootless container, hence not all SYS_ADMIN capabilites are available from the container
     if fuse_access; then
-        _podman_cmdline="${_podman_cmdline} --device /dev/fuse --cap-add SYS_ADMIN"
+        echo "AddDevice=/dev/fuse" >> "${quadlet_unit}"
+        echo "AddCapability=SYS_ADMIN" >> "${quadlet_unit}"
     else
         msg "${orange}[*]${no_format} fuse not available, --sshfs option will not work"
     fi
 
     # In case Selinux is enforced we need to configure it to allow host's filesystem access
     if type sestatus >/dev/null 2>&1; then
-        sestatus | grep -q 'mode: *enforcing' && _podman_cmdline="${_podman_cmdline} --security-opt label=disable"
+        sestatus | grep -q 'mode: *enforcing' && echo "SecurityLabelDisable=true" >> "${quadlet_unit}"
     fi
 
-    _podman_cmdline="${_podman_cmdline} \
-                     ${registry}/${image_name}:${_image_version}"
+    cat >> "${quadlet_unit}" <<EOF
 
-    eval "$_podman_cmdline" > /dev/null 2>&1 || return
+[Install]
+WantedBy=default.target
+EOF
+
     enable_container_service
 }
 
@@ -671,11 +668,14 @@ secbox_destroy(){
     # Remove systemd unit
     if [[ -f "$container_unit" ]]; then
         rm "$container_unit"
-        systemctl --user daemon-reload
     fi
+    if [[ -f "$quadlet_unit" ]]; then
+        rm "$quadlet_unit"
+    fi
+    systemctl --user daemon-reload
 
     local _image_id=$(local_image_container_version) # Get the container's image id
-    if podman container rm -f ${container} > /dev/null 2>&1; then
+    if podman container rm -f ${container} > /dev/null 2>&1 || true; then
         msg "${green}[.]${no_format} ${container} container deleted"
         # If -i flag exists, then remove image used by the deleted container
         if [[ -n "${_image_id:-}" ]] && [[ "${1:-}" == "-i" ]]; then
