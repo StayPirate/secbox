@@ -376,16 +376,8 @@ secbox_container_not_exists() {
 }
 
 create_container() {
-    podman image ls | grep -E "$image_name" >/dev/null 2>&1 || {
-        # If the image does not exist, pull it
-        msg "${orange}[*]${no_format} ${container} image not found"
-        read -ep "[.] Do you want to pull the image right now? [Y/n] " -n 1 -r
-        [[ $REPLY =~ ^[Nn]$ ]] &&
-            return 1
-        pull_image
-    }
-
-    local _image_version=$(local_most_recent_image_version)
+    local _target_version="${1:-}"
+    local _image_version="${_target_version:-$(local_most_recent_image_version)}"
 
     # In case a local image version cannot be found, use the upstream version
     # and podman will take care of pulling it if missing
@@ -396,6 +388,15 @@ create_container() {
     if [[ $_image_version == "" ]]; then
         msg "${red}[!]${no_format} Could not determine image version"
     fi
+
+    podman image ls | grep -E "$image_name" | grep -q "$_image_version" >/dev/null 2>&1 || {
+        # If the image does not exist, pull it
+        msg "${orange}[*]${no_format} ${container} image v.${_image_version} not found"
+        read -ep "[.] Do you want to pull the image right now? [Y/n] " -n 1 -r
+        [[ $REPLY =~ ^[Nn]$ ]] &&
+            return 1
+        pull_image "$_image_version"
+    }
 
     # The volume ${tmp_dir}:${tmp_dir} (aka ${XDG_RUNTIME_DIR:-/tmp}) adds
     # some usefull capabilities to the container, the most used ones (for me) are:
@@ -476,7 +477,7 @@ start_container() {
 local_image_container_version() {
     local _version=''
     secbox_container_exists && {
-        _version=$(podman container inspect --format '{{.ImageName}}' $container | cut -d ":" -f 2)
+        _version=$(podman container inspect --format '{{.ImageName}}' $container | awk -F ":" '{print $NF}')
     }
     echo "$_version"
 }
@@ -492,7 +493,8 @@ upstream_image_version() {
     _version=$(curl -LsSf ${registry_api}${image_name}/tags/list 2>/dev/null | \
                awk -F '"tags"' {'print $2'} | \
                cut -d "]" -f 1 | \
-               grep -Eo "[0-9.]+")
+               grep -Eo "[0-9.]+" | \
+               sort -Vr | head -n 1)
     if [[ $_version == "" ]]; then
         msg "${red}[!]${no_format} Could not obtain upstream image version from the registry. Are you sure /etc/pki/trust/anchors contains the internal CA cert?"
     fi
@@ -500,8 +502,9 @@ upstream_image_version() {
 }
 
 pull_image() {
+    local _target_version="${1:-}"
     suse_internal_network || return
-    local _upstream=$(upstream_image_version)
+    local _upstream=${_target_version:-$(upstream_image_version)}
     if podman pull "${registry}/${image_name}:${_upstream:-}" >/dev/null 2>&1; then
         msg "${green}[*]${no_format} ${registry}/${image_name} v.${_upstream:-} downloaded"
     else
@@ -511,8 +514,10 @@ pull_image() {
 }
 
 update_image() {
+    local _upstream=""
     if [[ "${1:-}" != "" ]]; then
         [[ "${1:-}" != "-f" && "${1:-}" != "--force" ]] && die "${1:-} not a valid flag"
+        _upstream=$(upstream_image_version)
         msg "[.] You are going to replace the current ${container} container with a new one which will use"
         read -ep "    the latest build of the container-image. Do you want to proceed? [Y/n] " -n 1 -r
     else
@@ -524,13 +529,13 @@ update_image() {
                ;;
             1) die "Your container is up-to-date, nothing to do here." ;;
         esac
-        local _upstream=$(upstream_image_version)
+        _upstream=$(upstream_image_version)
         msg "[.] A container update is available, do you want to update it now? [Y/n]"
         read -ep "    Changelog: https://gitlab.suse.de/security/secbox-image/-/tags/v${_upstream} " -n 1 -r
     fi
     if [[ ! $REPLY =~ ^[Nn]$ ]]; then
         secbox_container_exists && secbox_destroy -f -i
-        create_container
+        create_container "$_upstream"
         start_container
     else
         # Update denied by the user
