@@ -4,7 +4,7 @@
   <img src="https://i.imgur.com/m59i52q.png" height="130" width="130" alt="Mr MeeSeeks box"/>
 </p>
 
-TODO: description
+Secbox is a portable, containerized toolbox designed for the SUSE Security Team. It provides a standardized environment with all necessary tools (like `osc`, `quilt`, `bugzilla`) pre-installed and pre-configured, running seamlessly on any host OS via rootless Podman.
 
 - [Installation](#installation)
   - [OpenSUSE](#OpenSUSE-Leap-15.2--15.3--Tumbleweed)
@@ -95,7 +95,7 @@ Last but not least, don't forget `secbox --help` is your friend.
 
     Secbox is composed by two pieces, `secbox` and `secbox-image`.
 
-     * `secbox` is the software you can find in this repository and it's the **only thing** you have to take care of install, configure and use. It's written in bash because portability is an hard-requirement for me. If you check my [dotfiles](https://github.com/StayPirate/dotfiles) out you can undestand how much I care about portability.
+     * `secbox` is the software you can find in this repository and it's the **only thing** you have to take care of install, configure and use. It's written in bash because portability is an hard-requirement for me. It relies on **Podman Quadlets** to automatically and securely manage the container's lifecycle as a systemd service. If you check my [dotfiles](https://github.com/StayPirate/dotfiles) out you can undestand how much I care about portability.
 
      * `secbox-image` is the container image where all the needed tools and related dependencies are installed, its also easy to maintain with git since it's just a Dockerfile. In contrast of secbox, it's hosted in our internal [gitlab instance](https://gitlab.suse.de/security/secbox-image), not in GitHub. The reason is because there is a CI/CD pipeline which instructs IBS to rebuild the image at each new tag-push and publish it to our internal [registry](https://registry.suse.de). I'd love to use GitHub actions instead, but some of the rpms installed at build-phase are in private repositories :(, and only IBS does have access to them.
  * ### Break it! (Don't be afraid, it's just a container)
@@ -245,10 +245,16 @@ Last but not least, don't forget `secbox --help` is your friend.
 
     Now that you know how to customize your container, you don't have to forget that **any change you done in a live container will only last until that container is destroyed**.
 
-    TODO
+    If you want a tool or a configuration to be permanent for you and your whole team, you should submit a Pull Request to the [secbox-image](https://gitlab.suse.de/security/secbox-image) repository. Once the PR is merged, the CI/CD pipeline will automatically build a new container image. 
+    
+    You can then update your local container to use the latest image by running:
+    
+        host> secbox --update-container -f
+
+    Keep in mind that your `$HOME` directory is bind-mounted from the host. This means any scripts, code, or data you save in your home directory inside the container are completely persistent and will remain on your host machine even after the container is destroyed.
 
  * ### Network resources - Explained
 
-    If you are wondering why there is not one but two way to automatically mount network resources, then keep reading.
+    Some of the SUSE internal tools rely on legacy infrastructure or expect certain file paths to exist (e.g., `/mounts` or `/suse`). While you *could* configure your host system to mount these network file systems directly via NFS, this often requires root privileges and pollutes your host OS with SUSE-specific mount points.
 
-    TODO
+    Instead, Secbox uses **SSHFS** via the `--sshfs` flag to mount these resources directly into the container's namespace. Because it runs rootless, it relies on your host's SSH configuration (e.g., `~/.ssh/config` and `ssh-agent`) to seamlessly authenticate with `dist.suse.de` and securely expose these network shares only to the tools running inside Secbox.
