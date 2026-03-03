@@ -658,6 +658,7 @@ secbox_destroy(){
         shift
     fi
 
+    local _image_id=$(local_image_container_version) # Get the container's image id
     systemctl --user daemon-reload
     # Stop container if it's running
     if systemctl --user is-active --quiet $container.service >/dev/null 2>&1; then
@@ -676,7 +677,6 @@ secbox_destroy(){
     fi
     systemctl --user daemon-reload
 
-    local _image_id=$(local_image_container_version) # Get the container's image id
     if podman container rm -f ${container} > /dev/null 2>&1 || true; then
         msg "${green}[.]${no_format} ${container} container deleted"
         # If -i flag exists, then remove image used by the deleted container
