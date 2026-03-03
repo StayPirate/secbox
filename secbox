@@ -512,9 +512,9 @@ pull_image() {
 
 update_image() {
     local _upstream=""
+    _upstream=$(upstream_image_version)
     if [[ "${1:-}" != "" ]]; then
         [[ "${1:-}" != "-f" && "${1:-}" != "--force" ]] && die "${1:-} not a valid flag"
-        _upstream=$(upstream_image_version)
         msg "[.] You are going to replace the current ${container} container with a new one which will use"
         read -ep "    the latest build of the container-image. Do you want to proceed? [Y/n] " -n 1 -r
     else
@@ -526,7 +526,6 @@ update_image() {
                ;;
             1) die "Your container is up-to-date, nothing to do here." ;;
         esac
-        _upstream=$(upstream_image_version)
         msg "[.] A container update is available, do you want to update it now? [Y/n]"
         read -ep "    Changelog: https://gitlab.suse.de/security/secbox-image/-/tags/v${_upstream} " -n 1 -r
     fi
