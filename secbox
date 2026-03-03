@@ -386,10 +386,6 @@ create_container() {
        _image_version=$(upstream_image_version)
     fi
 
-    if [[ $_image_version == "" ]]; then
-        msg "${red}[!]${no_format} Could not determine image version"
-    fi
-
     podman image ls | grep -E "$image_name" | grep -q "$_image_version" >/dev/null 2>&1 || {
         # If the image does not exist, pull it
         msg "${orange}[*]${no_format} ${container} image v.${_image_version} not found"
