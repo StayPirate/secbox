@@ -224,6 +224,7 @@ if [ -z \$secbox_container_id ] && [ ! -f /run/.containerenv ]; then
     alias cved='${script_name} cve-desc.sh'
     alias prepare-kernel='${script_name} prepare-kernel'
     alias prepare-lp='${script_name} prepare-lp'
+    alias prepare-update='${script_name} prepare-update'
 
     ### Internal Tools (reactive)
     alias mtk='${script_name} mtk'
@@ -388,7 +389,7 @@ create_container() {
 
     podman image ls | grep -E "$image_name" | grep -q "$_image_version" >/dev/null 2>&1 || {
         # If the image does not exist, pull it
-        msg "${orange}[*]${no_format} ${container} image v.${_image_version} not found"
+        msg "${orange}[*]${no_format} ${container} image v${_image_version} not found"
         read -ep "[.] Do you want to pull the image right now? [Y/n] " -n 1 -r
         [[ $REPLY =~ ^[Nn]$ ]] &&
             return 1
