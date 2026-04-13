@@ -103,6 +103,7 @@ declare -r local_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/${container}"
 declare -r container_unit="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/${container}.service"
 declare -r quadlet_dir="${XDG_CONFIG_HOME:-$HOME/.config}/containers/systemd"
 declare -r quadlet_unit="${quadlet_dir}/${container}.container"
+declare -r update_check_interval=3600
 declare -ar host_env_vars=(
 ### List of environment variables to copy from the host at each run
     "SSH_AUTH_SOCK"
@@ -542,6 +543,18 @@ update_image() {
     return 1
 }
 
+update_check_is_due() {
+    local _last_check
+    _last_check=$(podman exec "$container" cat /var/tmp/.secbox_last_update_check 2>/dev/null) || return 0
+    local _now
+    _now=$(date +%s)
+    (( _now - _last_check >= update_check_interval ))
+}
+
+update_check_mark() {
+    podman exec "$container" sh -c 'date +%s > /var/tmp/.secbox_last_update_check' 2>/dev/null || true
+}
+
 update_available() {
     local _local_version=''
     local _version_in_use=''
@@ -763,13 +776,14 @@ main() {
 
     sync_name_resolvers
 
-    if suse_internal_network; then
-        update_available &&
-            msg "${yellow}[*]${no_format} A container update is available, use 'secbox --update-container' to update it."
-    fi
-
     if container_is_not_running; then
         start_container || die "${red}[!]${no_format} Cannot start the ${container} container"
+    fi
+
+    if suse_internal_network && update_check_is_due; then
+        update_check_mark
+        update_available &&
+            msg "${yellow}[*]${no_format} A container update is available, use 'secbox --update-container' to update it."
     fi
 
     if systemd_service_is_disabled; then
