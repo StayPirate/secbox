@@ -70,6 +70,18 @@ Secbox is a portable, containerized toolbox designed for the SUSE Security Team.
           Last login: Fri Jul 30 06:32:42 2021 from 2620:113:80c0:8340::11f1
           <YOUR_USERNAME>@Dist:~>
 
+ * ### **Ensure `secbox service` runs after log-out**
+
+    If you use `secbox` on a remote server and access it through SSH, you may bump into an undesired behaviour, where whenever you log out and login afer some time into your remote box, `secbox` restarts itself, forcing you to wait for some time while it launches the container.
+
+    This is an expected behaviour of `systemd`: in its user instance, it kills all user processes/services when last user session is closed (more precisely, after a grace-period of 120s from last session termination, `systemd` effectively starts killing the processes).
+
+    Sometimes this is not desiderable, so `systemd` provides a solution to it: _**user lingering**_, that makes the `systemd` user instance independent from the user session, preventing `systemd` from killing your user services.
+
+    To enable, simply issue:
+
+        sudo loginctl enable-linger $USER
+
 ## Try it
 
 If you successfully went through all the above steps you should now be able to use secbox! First of all, ensure your shell has sourced its updated rc-script (open a new shell, manually source it, or manually run `eval "$(secbox --alias)"`).
